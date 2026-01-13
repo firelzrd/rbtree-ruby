@@ -331,28 +331,20 @@ class RBTree
   # @param key [Object] the upper bound (exclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
-  # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
+  # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
-  #   tree.lt(3)  # => [[1, "one"], [2, "two"]]
-  #   tree.lt(3, reverse: true)  # => [[2, "two"], [1, "one"]]
+  #   tree.lt(3).to_a  # => [[1, "one"], [2, "two"]]
+  #   tree.lt(3, reverse: true).first  # => [2, "two"]
+  #   tree.lt(3) { |k, v| puts k }  # prints keys, returns self
   def lt(key, reverse: false, &block)
-    if block_given?
-      if reverse
-        traverse_lt_desc(@root, key, &block)
-      else
-        traverse_lt(@root, key, &block)
-      end
-      self
+    return enum_for(:lt, key, reverse: reverse) unless block_given?
+    if reverse
+      traverse_lt_desc(@root, key, &block)
     else
-      res = []
-      if reverse
-        traverse_lt_desc(@root, key) { |k, v| res << [k, v] }
-      else
-        traverse_lt(@root, key) { |k, v| res << [k, v] }
-      end
-      res
+      traverse_lt(@root, key, &block)
     end
+    self
   end
 
   # Retrieves all key-value pairs with keys less than or equal to the specified key.
@@ -360,28 +352,19 @@ class RBTree
   # @param key [Object] the upper bound (inclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
-  # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
+  # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
-  #   tree.lte(3)  # => [[1, "one"], [2, "two"], [3, "three"]]
-  #   tree.lte(3, reverse: true)  # => [[3, "three"], [2, "two"], [1, "one"]]
+  #   tree.lte(3).to_a  # => [[1, "one"], [2, "two"], [3, "three"]]
+  #   tree.lte(3, reverse: true).first  # => [3, "three"]
   def lte(key, reverse: false, &block)
-    if block_given?
-      if reverse
-        traverse_lte_desc(@root, key, &block)
-      else
-        traverse_lte(@root, key, &block)
-      end
-      self
+    return enum_for(:lte, key, reverse: reverse) unless block_given?
+    if reverse
+      traverse_lte_desc(@root, key, &block)
     else
-      res = []
-      if reverse
-        traverse_lte_desc(@root, key) { |k, v| res << [k, v] }
-      else
-        traverse_lte(@root, key) { |k, v| res << [k, v] }
-      end
-      res
+      traverse_lte(@root, key, &block)
     end
+    self
   end
 
   # Retrieves all key-value pairs with keys greater than the specified key.
@@ -389,28 +372,19 @@ class RBTree
   # @param key [Object] the lower bound (exclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
-  # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
+  # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
-  #   tree.gt(2)  # => [[3, "three"], [4, "four"]]
-  #   tree.gt(2, reverse: true)  # => [[4, "four"], [3, "three"]]
+  #   tree.gt(2).to_a  # => [[3, "three"], [4, "four"]]
+  #   tree.gt(2, reverse: true).first  # => [4, "four"]
   def gt(key, reverse: false, &block)
-    if block_given?
-      if reverse
-        traverse_gt_desc(@root, key, &block)
-      else
-        traverse_gt(@root, key, &block)
-      end
-      self
+    return enum_for(:gt, key, reverse: reverse) unless block_given?
+    if reverse
+      traverse_gt_desc(@root, key, &block)
     else
-      res = []
-      if reverse
-        traverse_gt_desc(@root, key) { |k, v| res << [k, v] }
-      else
-        traverse_gt(@root, key) { |k, v| res << [k, v] }
-      end
-      res
+      traverse_gt(@root, key, &block)
     end
+    self
   end
 
   # Retrieves all key-value pairs with keys greater than or equal to the specified key.
@@ -418,28 +392,19 @@ class RBTree
   # @param key [Object] the lower bound (inclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
-  # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
+  # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
-  #   tree.gte(2)  # => [[2, "two"], [3, "three"], [4, "four"]]
-  #   tree.gte(2, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"]]
+  #   tree.gte(2).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
+  #   tree.gte(2, reverse: true).first  # => [4, "four"]
   def gte(key, reverse: false, &block)
-    if block_given?
-      if reverse
-        traverse_gte_desc(@root, key, &block)
-      else
-        traverse_gte(@root, key, &block)
-      end
-      self
+    return enum_for(:gte, key, reverse: reverse) unless block_given?
+    if reverse
+      traverse_gte_desc(@root, key, &block)
     else
-      res = []
-      if reverse
-        traverse_gte_desc(@root, key) { |k, v| res << [k, v] }
-      else
-        traverse_gte(@root, key) { |k, v| res << [k, v] }
-      end
-      res
+      traverse_gte(@root, key, &block)
     end
+    self
   end
 
   # Retrieves all key-value pairs with keys within the specified range.
@@ -450,29 +415,19 @@ class RBTree
   # @param include_max [Boolean] whether to include the upper bound (default: true)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
-  # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
+  # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four', 5 => 'five'})
-  #   tree.between(2, 4)  # => [[2, "two"], [3, "three"], [4, "four"]]
-  #   tree.between(2, 4, include_min: false)  # => [[3, "three"], [4, "four"]]
-  #   tree.between(2, 4, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"]]
+  #   tree.between(2, 4).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
+  #   tree.between(2, 4, reverse: true).first  # => [4, "four"]
   def between(min, max, include_min: true, include_max: true, reverse: false, &block)
-    if block_given?
-      if reverse
-        traverse_between_desc(@root, min, max, include_min, include_max, &block)
-      else
-        traverse_between(@root, min, max, include_min, include_max, &block)
-      end
-      self
+    return enum_for(:between, min, max, include_min: include_min, include_max: include_max, reverse: reverse) unless block_given?
+    if reverse
+      traverse_between_desc(@root, min, max, include_min, include_max, &block)
     else
-      res = []
-      if reverse
-        traverse_between_desc(@root, min, max, include_min, include_max) { |k, v| res << [k, v] }
-      else
-        traverse_between(@root, min, max, include_min, include_max) { |k, v| res << [k, v] }
-      end
-      res
+      traverse_between(@root, min, max, include_min, include_max, &block)
     end
+    self
   end
 
   # Returns the key-value pair with the key closest to the given key.

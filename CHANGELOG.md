@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-01-14
+
+### Changed
+- **Range Query Returns Enumerator**: `lt`, `lte`, `gt`, `gte`, `between` now return an `Enumerator` instead of an `Array` when no block is given
+  - Enables lazy evaluation: `tree.gt(100).lazy.take(5).to_a`
+  - Enables chaining: `tree.lt(50).map { |k, v| k }`
+  - Use `.to_a` to get an Array: `tree.lt(50).to_a`
+  - **Breaking**: Code using direct array access like `tree.lt(50)[0]` must change to `tree.lt(50).first`
+
 ## [0.1.7] - 2026-01-14
 
 ### Added
@@ -107,9 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.1.8]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.8
 [0.1.7]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.7
 [0.1.6]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.6
-[0.1.5]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.5
-[0.1.4]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.4
-[0.1.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.3
-[0.1.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.2
