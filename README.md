@@ -1,5 +1,7 @@
 # rbtree-ruby
 
+🌍 *[English](README.md) | [日本語](README.ja.md)*
+
 A pure Ruby implementation of the Red-Black Tree data structure, providing efficient ordered key-value storage with O(log n) time complexity for insertion, deletion, and lookup operations.
 
 ## Features
@@ -62,10 +64,10 @@ tree.each { |key, value| puts "#{key}: #{value}" }
 tree.min  # => [1, "one"]
 tree.max  # => [20, "twenty"]
 
-# Range queries
-tree.lt(10)   # => [[1, "one"], [2, "two"], [3, "three"]]
-tree.gte(10)  # => [[10, "ten"], [20, "twenty"]]
-tree.between(2, 10)  # => [[2, "two"], [3, "three"], [10, "ten"]]
+# Range queries (return Enumerator, use .to_a for Array)
+tree.lt(10).to_a   # => [[1, "one"], [2, "two"], [3, "three"]]
+tree.gte(10).to_a  # => [[10, "ten"], [20, "twenty"]]
+tree.between(2, 10).to_a  # => [[2, "two"], [3, "three"], [10, "ten"]]
 
 # Shift and pop
 tree.shift  # => [1, "one"] (removes minimum)
@@ -148,15 +150,17 @@ tree.succ(7)   # => nil (no key larger than 7)
 
 ### Reverse Range Queries
 
-All range queries support a `:reverse` option to iterate in descending order:
+All range queries return an `Enumerator` (use `.to_a` for Array) and support a `:reverse` option:
 
 ```ruby
 tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
 
-tree.lt(3)                    # => [[1, "one"], [2, "two"]]
-tree.lt(3, reverse: true)     # => [[2, "two"], [1, "one"]]
+tree.lt(3).to_a                    # => [[1, "one"], [2, "two"]]
+tree.lt(3, reverse: true).to_a     # => [[2, "two"], [1, "one"]]
+tree.lt(3).first                   # => [1, "one"] (lazy, no array created)
 
-tree.between(1, 4, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"], [1, "one"]]
+# Lazy evaluation
+tree.gt(0).lazy.take(2).to_a  # => [[1, "one"], [2, "two"]] (only computes first 2)
 ```
 
 ### MultiRBTree Value Array Access

@@ -8,11 +8,12 @@ Gem::Specification.new do |spec|
   spec.authors = ["Masahito Suzuki"]
   spec.email   = ["firelzrd@gmail.com"]
 
-  spec.summary     = "A pure Ruby implementation of Red-Black Tree with multi-value support"
+  spec.summary     = "A pure Ruby Red-Black Tree with O(1) lookup, range queries, and multi-value support"
   spec.description = <<~DESC
-    RBTree is a pure Ruby implementation of the Red-Black Tree data structure,
-    providing efficient ordered key-value storage with O(log n) operations.
-    Includes MultiRBTree for handling duplicate keys with linked lists.
+    A high-performance pure Ruby Red-Black Tree implementation. Features: O(1) key
+    lookup via hybrid hash index, O(log n) insert/delete, lazy Enumerator-based
+    range queries (lt/gt/between), nearest/prev/succ search, memory-efficient node
+    pooling, and MultiRBTree for duplicate keys with first/last value access.
   DESC
   spec.homepage = "https://github.com/firelzrd/rbtree-ruby"
   spec.license  = "MIT"

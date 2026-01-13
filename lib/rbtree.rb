@@ -1461,9 +1461,10 @@ class MultiRBTree < RBTree
     [n.key, last ? n.value.last : n.value.first]
   end
 
-  def nearest(key)
+  def nearest(key, last: false)
     n = find_nearest_node(key)
-    n == @nil_node || n.value.empty? ? nil : [n.key, n.value.first]
+    return nil if n == @nil_node || n.value.empty?
+    [n.key, last ? n.value.last : n.value.first]
   end
 
   def prev(key, last: false)
