@@ -329,19 +329,28 @@ class RBTree
   # Retrieves all key-value pairs with keys less than the specified key.
   #
   # @param key [Object] the upper bound (exclusive)
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.lt(3)  # => [[1, "one"], [2, "two"]]
-  #   tree.lt(3) { |k, v| puts "#{k}: #{v}" }  # prints pairs and returns tree
-  def lt(key, &block)
+  #   tree.lt(3, reverse: true)  # => [[2, "two"], [1, "one"]]
+  def lt(key, reverse: false, &block)
     if block_given?
-      traverse_lt(@root, key, &block)
+      if reverse
+        traverse_lt_desc(@root, key, &block)
+      else
+        traverse_lt(@root, key, &block)
+      end
       self
     else
       res = []
-      traverse_lt(@root, key) { |k, v| res << [k, v] }
+      if reverse
+        traverse_lt_desc(@root, key) { |k, v| res << [k, v] }
+      else
+        traverse_lt(@root, key) { |k, v| res << [k, v] }
+      end
       res
     end
   end
@@ -349,18 +358,28 @@ class RBTree
   # Retrieves all key-value pairs with keys less than or equal to the specified key.
   #
   # @param key [Object] the upper bound (inclusive)
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.lte(3)  # => [[1, "one"], [2, "two"], [3, "three"]]
-  def lte(key, &block)
+  #   tree.lte(3, reverse: true)  # => [[3, "three"], [2, "two"], [1, "one"]]
+  def lte(key, reverse: false, &block)
     if block_given?
-      traverse_lte(@root, key, &block)
+      if reverse
+        traverse_lte_desc(@root, key, &block)
+      else
+        traverse_lte(@root, key, &block)
+      end
       self
     else
       res = []
-      traverse_lte(@root, key) { |k, v| res << [k, v] }
+      if reverse
+        traverse_lte_desc(@root, key) { |k, v| res << [k, v] }
+      else
+        traverse_lte(@root, key) { |k, v| res << [k, v] }
+      end
       res
     end
   end
@@ -368,18 +387,28 @@ class RBTree
   # Retrieves all key-value pairs with keys greater than the specified key.
   #
   # @param key [Object] the lower bound (exclusive)
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.gt(2)  # => [[3, "three"], [4, "four"]]
-  def gt(key, &block)
+  #   tree.gt(2, reverse: true)  # => [[4, "four"], [3, "three"]]
+  def gt(key, reverse: false, &block)
     if block_given?
-      traverse_gt(@root, key, &block)
+      if reverse
+        traverse_gt_desc(@root, key, &block)
+      else
+        traverse_gt(@root, key, &block)
+      end
       self
     else
       res = []
-      traverse_gt(@root, key) { |k, v| res << [k, v] }
+      if reverse
+        traverse_gt_desc(@root, key) { |k, v| res << [k, v] }
+      else
+        traverse_gt(@root, key) { |k, v| res << [k, v] }
+      end
       res
     end
   end
@@ -387,18 +416,28 @@ class RBTree
   # Retrieves all key-value pairs with keys greater than or equal to the specified key.
   #
   # @param key [Object] the lower bound (inclusive)
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.gte(2)  # => [[2, "two"], [3, "three"], [4, "four"]]
-  def gte(key, &block)
+  #   tree.gte(2, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"]]
+  def gte(key, reverse: false, &block)
     if block_given?
-      traverse_gte(@root, key, &block)
+      if reverse
+        traverse_gte_desc(@root, key, &block)
+      else
+        traverse_gte(@root, key, &block)
+      end
       self
     else
       res = []
-      traverse_gte(@root, key) { |k, v| res << [k, v] }
+      if reverse
+        traverse_gte_desc(@root, key) { |k, v| res << [k, v] }
+      else
+        traverse_gte(@root, key) { |k, v| res << [k, v] }
+      end
       res
     end
   end
@@ -409,20 +448,29 @@ class RBTree
   # @param max [Object] the upper bound
   # @param include_min [Boolean] whether to include the lower bound (default: true)
   # @param include_max [Boolean] whether to include the upper bound (default: true)
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Array<Array(Object, Object)>, RBTree] array of [key, value] pairs if no block, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four', 5 => 'five'})
   #   tree.between(2, 4)  # => [[2, "two"], [3, "three"], [4, "four"]]
   #   tree.between(2, 4, include_min: false)  # => [[3, "three"], [4, "four"]]
-  #   tree.between(2, 4, include_max: false)  # => [[2, "two"], [3, "three"]]
-  def between(min, max, include_min: true, include_max: true, &block)
+  #   tree.between(2, 4, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"]]
+  def between(min, max, include_min: true, include_max: true, reverse: false, &block)
     if block_given?
-      traverse_between(@root, min, max, include_min, include_max, &block)
+      if reverse
+        traverse_between_desc(@root, min, max, include_min, include_max, &block)
+      else
+        traverse_between(@root, min, max, include_min, include_max, &block)
+      end
       self
     else
       res = []
-      traverse_between(@root, min, max, include_min, include_max) { |k, v| res << [k, v] }
+      if reverse
+        traverse_between_desc(@root, min, max, include_min, include_max) { |k, v| res << [k, v] }
+      else
+        traverse_between(@root, min, max, include_min, include_max) { |k, v| res << [k, v] }
+      end
       res
     end
   end
@@ -442,6 +490,40 @@ class RBTree
   def nearest(key)
     return nil unless key.respond_to?(:-)
     n = find_nearest_node(key)
+    n == @nil_node ? nil : [n.key, n.value]
+  end
+
+  # Returns the key-value pair with the largest key that is smaller than the given key.
+  #
+  # If the key exists in the tree, returns the predecessor (previous element).
+  # If the key does not exist, returns the largest key-value pair with key < given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if no predecessor exists
+  # @example
+  #   tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
+  #   tree.prev(5)   # => [3, "three"]
+  #   tree.prev(4)   # => [3, "three"] (4 does not exist)
+  #   tree.prev(1)   # => nil (no predecessor)
+  def prev(key)
+    n = find_predecessor_node(key)
+    n == @nil_node ? nil : [n.key, n.value]
+  end
+
+  # Returns the key-value pair with the smallest key that is larger than the given key.
+  #
+  # If the key exists in the tree, returns the successor (next element).
+  # If the key does not exist, returns the smallest key-value pair with key > given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if no successor exists
+  # @example
+  #   tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
+  #   tree.succ(5)   # => [7, "seven"]
+  #   tree.succ(4)   # => [5, "five"] (4 does not exist)
+  #   tree.succ(7)   # => nil (no successor)
+  def succ(key)
+    n = find_successor_node(key)
     n == @nil_node ? nil : [n.key, n.value]
   end
 
@@ -590,6 +672,98 @@ class RBTree
     
     if (node.key <=> max) < 0
       traverse_between(node.right, min, max, include_min, include_max, &block)
+    end
+  end
+
+  # Traverses nodes with keys less than the specified key in descending order.
+  #
+  # @param node [Node] the current node
+  # @param key [Object] the upper bound (exclusive)
+  # @yield [key, value] each matching key-value pair in descending order
+  # @return [void]
+  def traverse_lt_desc(node, key, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> key) < 0
+      traverse_lt_desc(node.right, key, &block)
+      yield node.key, node.value
+    end
+    traverse_lt_desc(node.left, key, &block)
+  end
+
+  # Traverses nodes with keys less than or equal to the specified key in descending order.
+  #
+  # @param node [Node] the current node
+  # @param key [Object] the upper bound (inclusive)
+  # @yield [key, value] each matching key-value pair in descending order
+  # @return [void]
+  def traverse_lte_desc(node, key, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> key) <= 0
+      traverse_lte_desc(node.right, key, &block)
+      yield node.key, node.value
+    end
+    traverse_lte_desc(node.left, key, &block)
+  end
+
+  # Traverses nodes with keys greater than the specified key in descending order.
+  #
+  # @param node [Node] the current node
+  # @param key [Object] the lower bound (exclusive)
+  # @yield [key, value] each matching key-value pair in descending order
+  # @return [void]
+  def traverse_gt_desc(node, key, &block)
+    return if node == @nil_node
+    
+    traverse_gt_desc(node.right, key, &block)
+    if (node.key <=> key) > 0
+      yield node.key, node.value
+      traverse_gt_desc(node.left, key, &block)
+    end
+  end
+
+  # Traverses nodes with keys greater than or equal to the specified key in descending order.
+  #
+  # @param node [Node] the current node
+  # @param key [Object] the lower bound (inclusive)
+  # @yield [key, value] each matching key-value pair in descending order
+  # @return [void]
+  def traverse_gte_desc(node, key, &block)
+    return if node == @nil_node
+    
+    traverse_gte_desc(node.right, key, &block)
+    if (node.key <=> key) >= 0
+      yield node.key, node.value
+      traverse_gte_desc(node.left, key, &block)
+    end
+  end
+
+  # Traverses nodes with keys within the specified range in descending order.
+  #
+  # @param node [Node] the current node
+  # @param min [Object] the lower bound
+  # @param max [Object] the upper bound
+  # @param include_min [Boolean] whether to include the lower bound
+  # @param include_max [Boolean] whether to include the upper bound
+  # @yield [key, value] each matching key-value pair in descending order
+  # @return [void]
+  def traverse_between_desc(node, min, max, include_min, include_max, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> max) < 0
+      traverse_between_desc(node.right, min, max, include_min, include_max, &block)
+    end
+    
+    greater = include_min ? (node.key <=> min) >= 0 : (node.key <=> min) > 0
+    less = include_max ? (node.key <=> max) <= 0 : (node.key <=> max) < 0
+    
+    if greater && less
+      yield node.key, node.value
+    end
+    
+    if (node.key <=> min) > 0
+      traverse_between_desc(node.left, min, max, include_min, include_max, &block)
     end
   end
 
@@ -842,6 +1016,86 @@ class RBTree
     closest
   end
 
+  # Finds the node with the largest key that is smaller than the given key.
+  #
+  # If the key exists in the tree, returns its predecessor node.
+  # If the key does not exist, returns the largest node with key < given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Node] the predecessor node, or @nil_node if none exists
+  def find_predecessor_node(key)
+    # Check if key exists using O(1) hash lookup
+    if (node = @hash_index[key])
+      # Key exists: find predecessor in subtree or ancestors
+      if node.left != @nil_node
+        return rightmost(node.left)
+      else
+        # Walk up to find first ancestor where we came from the right
+        current = node
+        parent = current.parent
+        while parent != @nil_node && current == parent.left
+          current = parent
+          parent = parent.parent
+        end
+        return parent
+      end
+    end
+
+    # Key doesn't exist: descend tree tracking the best candidate
+    current = @root
+    predecessor = @nil_node
+    while current != @nil_node
+      cmp = key <=> current.key
+      if cmp > 0
+        predecessor = current  # This node's key < given key
+        current = current.right
+      else
+        current = current.left
+      end
+    end
+    predecessor
+  end
+
+  # Finds the node with the smallest key that is larger than the given key.
+  #
+  # If the key exists in the tree, returns its successor node.
+  # If the key does not exist, returns the smallest node with key > given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Node] the successor node, or @nil_node if none exists
+  def find_successor_node(key)
+    # Check if key exists using O(1) hash lookup
+    if (node = @hash_index[key])
+      # Key exists: find successor in subtree or ancestors
+      if node.right != @nil_node
+        return leftmost(node.right)
+      else
+        # Walk up to find first ancestor where we came from the left
+        current = node
+        parent = current.parent
+        while parent != @nil_node && current == parent.right
+          current = parent
+          parent = parent.parent
+        end
+        return parent
+      end
+    end
+
+    # Key doesn't exist: descend tree tracking the best candidate
+    current = @root
+    successor = @nil_node
+    while current != @nil_node
+      cmp = key <=> current.key
+      if cmp < 0
+        successor = current  # This node's key > given key
+        current = current.left
+      else
+        current = current.right
+      end
+    end
+    successor
+  end
+
   # Finds the leftmost (minimum) node in a subtree.
   #
   # @param node [Node] the root of the subtree
@@ -994,7 +1248,39 @@ end
 # * Multiple values per key using arrays
 # * Separate methods for single deletion (`delete_one`) vs. all deletions (`delete`)
 # * Values for each key maintain insertion order
-# * min/max return first/last values respectively
+# * Configurable access to first or last value via `:last` option
+#
+# == Value Array Access
+#
+# For each key, values are stored in insertion order. Methods that access
+# a single value support a `:last` option to choose which end of the array:
+#
+# * +get(key)+, +get_first(key)+ - returns first value (oldest)
+# * +get(key, last: true)+, +get_last(key)+ - returns last value (newest)
+# * +delete_one(key)+, +delete_first(key)+ - removes first value
+# * +delete_one(key, last: true)+, +delete_last(key)+ - removes last value
+# * +prev(key)+, +succ(key)+ - returns first value of adjacent key
+# * +prev(key, last: true)+, +succ(key, last: true)+ - returns last value
+#
+# == Boundary Operations
+#
+# * +min+, +max+ - return [key, first_value] by default
+# * +min(last: true)+, +max(last: true)+ - return [key, last_value]
+# * +shift+ - removes and returns [smallest_key, first_value]
+# * +pop+ - removes and returns [largest_key, last_value]
+#
+# == Iteration Order
+#
+# When iterating over values, the order depends on the direction:
+#
+# * Forward iteration (+each+, +lt+, +gt+, etc.): Each key's values are
+#   yielded in insertion order (first to last).
+#
+# * Reverse iteration (+reverse_each+, +lt(key, reverse: true)+, etc.):
+#   Each key's values are yielded in reverse insertion order (last to first).
+#
+# This ensures consistent behavior where reverse iteration is truly the
+# mirror image of forward iteration.
 #
 # == Usage
 #
@@ -1003,32 +1289,55 @@ end
 #   tree.insert(1, 'second one')
 #   tree.insert(2, 'two')
 #
-#   tree.size           # => 3 (total key-value pairs)
-#   tree.get(1)         # => "first one" (first value)
-#   tree.get_all(1)     # => ["first one", "second one"] (all values)
+#   tree.size             # => 3 (total key-value pairs)
+#   tree.get(1)           # => "first one" (first value)
+#   tree.get(1, last: true)  # => "second one" (last value)
+#   tree.get_all(1)       # => ["first one", "second one"] (all values)
 #
-#   tree.delete_one(1)  # removes only "first one"
-#   tree.get(1)         # => "second one"
+#   tree.delete_one(1)    # removes only "first one"
+#   tree.get(1)           # => "second one"
 #
-#   tree.delete(1)      # removes all remaining values for key 1
+#   tree.delete(1)        # removes all remaining values for key 1
 #
 # @author Masahito Suzuki
 # @since 0.1.2
 class MultiRBTree < RBTree
-  # Retrieves the first value associated with the given key.
+  # Retrieves a value associated with the given key.
   #
   # @param key [Object] the key to look up
-  # @return [Object, nil] the first value for the key, or nil if not found
+  # @param last [Boolean] if true, return the last value; otherwise return the first (default: false)
+  # @return [Object, nil] the value for the key, or nil if not found
   # @example
   #   tree = MultiRBTree.new
   #   tree.insert(1, 'first')
   #   tree.insert(1, 'second')
-  #   tree.get(1)  # => "first"
-  def get(key)
+  #   tree.get(1)              # => "first"
+  #   tree.get(1, last: true)  # => "second"
+  def get(key, last: false)
     n = find_node(key)
-    n == @nil_node || n.value.empty? ? nil : n.value.first
+    return nil if n == @nil_node || n.value.empty?
+    last ? n.value.last : n.value.first
   end
-  alias_method :[], :get
+
+  # Retrieves the first value associated with the given key.
+  #
+  # @param key [Object] the key to look up
+  # @return [Object, nil] the first value for the key, or nil if not found
+  def get_first(key) = get(key, last: false)
+
+  # Retrieves the last value associated with the given key.
+  #
+  # @param key [Object] the key to look up
+  # @return [Object, nil] the last value for the key, or nil if not found
+  def get_last(key) = get(key, last: true)
+
+  # Returns the first value for the given key (for Hash-like access).
+  #
+  # Note: Unlike get(), this method does not accept options.
+  #
+  # @param key [Object] the key to look up
+  # @return [Object, nil] the first value for the key, or nil if not found
+  def [](key) = get(key)
 
   # Retrieves all values associated with the given key.
   #
@@ -1059,6 +1368,7 @@ class MultiRBTree < RBTree
   def insert(key, value)
     if (node = @hash_index[key])
       node.value << value
+      @size += 1
       return true
     end
     y = @nil_node
@@ -1099,24 +1409,25 @@ class MultiRBTree < RBTree
     true
   end
 
-  # Deletes only the first value for the specified key.
+  # Deletes a single value for the specified key.
   #
-  # If the key has multiple values, removes only the first one.
+  # If the key has multiple values, removes only one value.
   # If this was the last value for the key, the node is removed from the tree.
   #
   # @param key [Object] the key to delete from
+  # @param last [Boolean] if true, remove the last value; otherwise remove the first (default: false)
   # @return [Object, nil] the deleted value, or nil if key not found
   # @example
   #   tree = MultiRBTree.new
   #   tree.insert(1, 'first')
   #   tree.insert(1, 'second')
-  #   tree.delete_one(1)  # => "first"
-  #   tree.get(1)         # => "second"
-  def delete_one(key)
+  #   tree.delete_one(1)              # => "first"
+  #   tree.delete_one(1, last: true)  # => "second" (if more values existed)
+  def delete_one(key, last: false)
     z = @hash_index[key]  # O(1) lookup
     return nil unless z
 
-    value = z.value.shift
+    value = last ? z.value.pop : z.value.shift
     @size -= 1
     if z.value.empty?
       @hash_index.delete(key)  # Remove from index when node removed
@@ -1124,6 +1435,18 @@ class MultiRBTree < RBTree
     end
     value
   end
+
+  # Deletes the first value for the specified key.
+  #
+  # @param key [Object] the key to delete from
+  # @return [Object, nil] the deleted value, or nil if key not found
+  def delete_first(key) = delete_one(key, last: false)
+
+  # Deletes the last value for the specified key.
+  #
+  # @param key [Object] the key to delete from
+  # @return [Object, nil] the deleted value, or nil if key not found
+  def delete_last(key) = delete_one(key, last: true)
 
   # Deletes all values for the specified key.
   #
@@ -1172,18 +1495,32 @@ class MultiRBTree < RBTree
     [n.key, val]
   end
 
-  def min
+  def min(last: false)
     return nil if @min_node == @nil_node || @min_node.value.empty?
-    [@min_node.key, @min_node.value.first]
+    [@min_node.key, last ? @min_node.value.last : @min_node.value.first]
   end
 
-  def max
+  def max(last: false)
     n = rightmost(@root)
-    n == @nil_node || n.value.empty? ? nil : [n.key, n.value.first]
+    return nil if n == @nil_node || n.value.empty?
+    [n.key, last ? n.value.last : n.value.first]
   end
 
   def nearest(key)
-    (n = super(key)) ? [n[0], n[1].first] : nil
+    n = find_nearest_node(key)
+    n == @nil_node || n.value.empty? ? nil : [n.key, n.value.first]
+  end
+
+  def prev(key, last: false)
+    n = find_predecessor_node(key)
+    return nil if n == @nil_node || n.value.empty?
+    [n.key, last ? n.value.last : n.value.first]
+  end
+
+  def succ(key, last: false)
+    n = find_successor_node(key)
+    return nil if n == @nil_node || n.value.empty?
+    [n.key, last ? n.value.last : n.value.first]
   end
 
   private
@@ -1271,6 +1608,65 @@ class MultiRBTree < RBTree
     
     if (node.key <=> max) < 0
       traverse_between(node.right, min, max, include_min, include_max, &block)
+    end
+  end
+
+  def traverse_lt_desc(node, key, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> key) < 0
+      traverse_lt_desc(node.right, key, &block)
+      node.value.reverse_each { |v| yield node.key, v }
+    end
+    traverse_lt_desc(node.left, key, &block)
+  end
+
+  def traverse_lte_desc(node, key, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> key) <= 0
+      traverse_lte_desc(node.right, key, &block)
+      node.value.reverse_each { |v| yield node.key, v }
+    end
+    traverse_lte_desc(node.left, key, &block)
+  end
+
+  def traverse_gt_desc(node, key, &block)
+    return if node == @nil_node
+    
+    traverse_gt_desc(node.right, key, &block)
+    if (node.key <=> key) > 0
+      node.value.reverse_each { |v| yield node.key, v }
+      traverse_gt_desc(node.left, key, &block)
+    end
+  end
+
+  def traverse_gte_desc(node, key, &block)
+    return if node == @nil_node
+    
+    traverse_gte_desc(node.right, key, &block)
+    if (node.key <=> key) >= 0
+      node.value.reverse_each { |v| yield node.key, v }
+      traverse_gte_desc(node.left, key, &block)
+    end
+  end
+
+  def traverse_between_desc(node, min, max, include_min, include_max, &block)
+    return if node == @nil_node
+    
+    if (node.key <=> max) < 0
+      traverse_between_desc(node.right, min, max, include_min, include_max, &block)
+    end
+    
+    greater = include_min ? (node.key <=> min) >= 0 : (node.key <=> min) > 0
+    less = include_max ? (node.key <=> max) <= 0 : (node.key <=> max) < 0
+    
+    if greater && less
+      node.value.reverse_each { |v| yield node.key, v }
+    end
+    
+    if (node.key <=> min) > 0
+      traverse_between_desc(node.left, min, max, include_min, include_max, &block)
     end
   end
 end

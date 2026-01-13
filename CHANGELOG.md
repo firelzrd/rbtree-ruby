@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-01-14
+
+### Added
+- **Predecessor/Successor Search**: New `prev(key)` and `succ(key)` methods
+  - Returns the key-value pair immediately before/after the given key
+  - Works even if the key doesn't exist in the tree (returns nearest neighbor)
+  - Uses hash index for O(1) existence check, then O(log n) tree traversal
+- **Reverse Range Queries**: All range query methods now support `:reverse` option
+  - `lt(key, reverse: true)`, `lte`, `gt`, `gte`, `between` 
+  - Returns results in descending order instead of ascending
+- **MultiRBTree Enhancements**:
+  - `get(key, last: false)` - Choose first or last value from array
+  - `get_first(key)`, `get_last(key)` - Convenient aliases
+  - `delete_one(key, last: false)` - Choose which end to delete from
+  - `delete_first(key)`, `delete_last(key)` - Convenient aliases
+  - `min(last: false)`, `max(last: false)` - Choose first or last value
+  - `prev(key, last: false)`, `succ(key, last: false)` - Choose first or last value
+
+### Changed
+- **MultiRBTree Iteration**: Reverse iteration (`reverse_each`, `lt(..., reverse: true)`, etc.) now iterates each key's value array in reverse order (last to first), making it a true mirror of forward iteration
+
+### Fixed
+- **MultiRBTree size tracking**: Fixed bug where `insert` did not increment size when key already existed in hash index
+
 ## [0.1.6] - 2026-01-13
 
 ### Changed
@@ -83,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.1.7]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.7
 [0.1.6]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.6
 [0.1.5]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.5
 [0.1.4]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.4

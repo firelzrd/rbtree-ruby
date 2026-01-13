@@ -127,6 +127,66 @@ tree.nearest(7)   # => [5, "five"]  (same distance, returns smaller key)
 tree.nearest(8)   # => [10, "ten"]
 ```
 
+### Predecessor/Successor Search
+
+Find the next or previous key in the tree:
+
+```ruby
+tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
+
+tree.prev(5)   # => [3, "three"]  (largest key < 5)
+tree.succ(5)   # => [7, "seven"]  (smallest key > 5)
+
+# Works even if the key doesn't exist
+tree.prev(4)   # => [3, "three"]  (4 doesn't exist, returns largest key < 4)
+tree.succ(4)   # => [5, "five"]   (4 doesn't exist, returns smallest key > 4)
+
+# Returns nil at boundaries
+tree.prev(1)   # => nil (no key smaller than 1)
+tree.succ(7)   # => nil (no key larger than 7)
+```
+
+### Reverse Range Queries
+
+All range queries support a `:reverse` option to iterate in descending order:
+
+```ruby
+tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
+
+tree.lt(3)                    # => [[1, "one"], [2, "two"]]
+tree.lt(3, reverse: true)     # => [[2, "two"], [1, "one"]]
+
+tree.between(1, 4, reverse: true)  # => [[4, "four"], [3, "three"], [2, "two"], [1, "one"]]
+```
+
+### MultiRBTree Value Array Access
+
+For keys with multiple values, choose which value to access:
+
+```ruby
+tree = MultiRBTree.new
+tree.insert(1, 'first')
+tree.insert(1, 'second')
+tree.insert(1, 'third')
+
+# Access first or last value
+tree.get(1)               # => "first"
+tree.get(1, last: true)   # => "third"
+tree.get_first(1)         # => "first"
+tree.get_last(1)          # => "third"
+
+# Delete from either end
+tree.delete_first(1)      # => "first"
+tree.delete_last(1)       # => "third"  
+tree.get(1)               # => "second"
+
+# min/max with :last option
+tree.insert(2, 'a')
+tree.insert(2, 'b')
+tree.min                  # => [1, "second"] (first value of min key)
+tree.max(last: true)      # => [2, "b"]      (last value of max key)
+```
+
 ## Performance
 
 All major operations run in **O(log n)** time:
@@ -138,6 +198,7 @@ All major operations run in **O(log n)** time:
 - `min` - **O(1)**
 - `max` - O(log n)
 - `shift` / `pop` - O(log n)
+- `prev` / `succ` - O(log n) with O(1) hash check
 
 Iteration over all elements takes O(n) time.
 
