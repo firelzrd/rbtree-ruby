@@ -2,8 +2,7 @@
 
 🌍 *[English](README.md) | [日本語](README.ja.md)*
 
-A pure Ruby implementation of the Red-Black Tree data structure, providing efficient ordered
-key-value storage with O(log n) time complexity for insertion, deletion, and lookup operations.
+A pure Ruby implementation of the Red-Black Tree data structure, providing efficient ordered key-value storage with O(log n) time complexity for insertion, deletion, and lookup operations.
 
 ## Features
 
@@ -43,13 +42,18 @@ require 'rbtree'
 # Create an empty tree
 tree = RBTree.new
 
-# Or initialize with data
+# Or initialize with data (Bulk Insert)
 tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
 tree = RBTree[[5, 'five'], [4, 'four']]
+tree = RBTree.new do # Block initialization
+  data_source.each { |data| [data.time, data.content] } 
+end
 
 # Insert and retrieve values
 tree.insert(10, 'ten')
 tree[20] = 'twenty'
+# Bulk insert
+tree.insert({30 => 'thirty', 40 => 'forty'})
 puts tree[10]  # => "ten"
 
 # Iterate in sorted order
@@ -229,7 +233,7 @@ For ordered and spatial operations, RBTree is not just faster—it is in a compl
 | **Range Queries** | **O(log n + k)** | O(n) filter | **~540x faster** | Direct subtree jump vs full scan |
 | **Min Extraction** | **O(log n)** | O(n) search | **~160x faster** | Continuous rebalancing vs full scan |
 | **Sorted Iteration** | **O(n)** | O(n log n) | **FREE** | Always sorted vs explicit `sort` |
-| **Key Lookup** | **O(1)** | O(1) | **Equal** | Optimized Hybrid Hash Index |
+| **Key Lookup** | **O(1)** | O(1) | **Equal** | **Hybrid Hash Index provides O(1) access like standard Hash** |
 
 ### When to Use RBTree
 

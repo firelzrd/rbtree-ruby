@@ -72,11 +72,15 @@ class RBTree
 
   # Initializes a new RBTree.
   #
-  # The tree can be initialized empty or populated with initial data from a Hash or Array.
+  # The tree can be initialized empty or populated with initial data from a Hash, Array, or Enumerator.
+  # A block can also be provided to supply the initial data.
   #
   # @param args [Hash, Array, nil] optional initial data
+  # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
+  # @yieldreturn [Object] optional initial data
   #   - If a Hash is provided, each key-value pair is inserted into the tree
   #   - If an Array is provided, it should contain [key, value] pairs
+  #   - If a block is provided, it is yielded to get the source data
   #   - If no arguments are provided, an empty tree is created
   # @raise [ArgumentError] if arguments are invalid
   # @example Create an empty tree
@@ -85,7 +89,9 @@ class RBTree
   #   tree = RBTree.new({1 => 'one', 2 => 'two'})
   # @example Create from an array
   #   tree = RBTree.new([[1, 'one'], [2, 'two']])
-  def initialize(*args)
+  # @example Create with overwrite: false
+  #   tree = RBTree.new([[1, 'one'], [1, 'uno']], overwrite: false)
+  def initialize(*args, overwrite: true, &block)
     @nil_node = Node.new
     @nil_node.color = Node::BLACK
     @nil_node.left = @nil_node
@@ -96,19 +102,8 @@ class RBTree
     @node_pool = []   # Memory pool for recycling nodes
     @size = 0
 
-    if args.any?
-      source = args.size == 1 ? args.first : args
-      case source
-      when Hash
-        source.each { |k, v| insert(k, v) }
-      when Array
-        source.each do |arg| 
-          key, value = arg
-          insert(key, value)
-        end
-      else
-        raise ArgumentError, "Invalid arguments"
-      end
+    if args.size > 0 || block_given?
+      insert(*args, overwrite: overwrite, &block)
     end
   end
 
@@ -211,63 +206,67 @@ class RBTree
     n == @nil_node ? nil : n.pair
   end
 
-  # Inserts or updates a key-value pair in the tree.
+  # Inserts one or more key-value pairs into the tree.
+  #
+  # This method supports both single entry insertion and bulk insertion.
+  #
+  # Single insertion:
+  #   insert(key, value, overwrite: true)
+  #
+  # Bulk insertion:
+  #   insert(hash, overwrite: true)
+  #   insert(array_of_pairs, overwrite: true)
+  #   insert(enumerator, overwrite: true)
+  #   insert { data_source }
   #
   # If the key already exists and overwrite is true (default), the value is updated.
   # If overwrite is false and the key exists, the operation returns nil without modification.
   #
-  # @param key [Object] the key to insert (must implement <=>)
-  # @param value [Object] the value to associate with the key
+  # @param args [Object] key (and value) or source object
   # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
-  # @return [Boolean, nil] true if inserted/updated, nil if key exists and overwrite is false
-  # @example
-  #   tree = RBTree.new
-  #   tree.insert(1, 'one')        # => true
-  #   tree.insert(1, 'ONE')        # => true (overwrites)
-  #   tree.insert(1, 'uno', overwrite: false)  # => nil (no change)
-  #   tree[2] = 'two'              # using alias
-  def insert(key, value, overwrite: true)
-    if (node = @hash_index[key])
-      return nil unless overwrite
-      node.value = value
-      return true
-    end
-    y = @nil_node
-    x = @root
-    while x != @nil_node
-      y = x
-      cmp = key <=> x.key
-      if cmp == 0
-        return nil unless overwrite
-        x.value = value
-        return true
-      elsif cmp < 0
-        x = x.left
+  # @yieldreturn [Object] data source for bulk insertion
+  # @return [Boolean, nil] true if inserted/updated, nil if key exists and overwrite is false (for single insert)
+  # @example Single insert
+  #   tree.insert(1, 'one')
+  # @example Bulk insert from Hash
+  #   tree.insert({1 => 'one', 2 => 'two'})
+  # @example Bulk insert from Array
+  #   tree.insert([[1, 'one'], [2, 'two']])
+  def insert(*args, overwrite: true, &block)
+    if args.size == 2
+      key, value = args
+      insert_entry(key, value, overwrite: overwrite)
+    else
+      source = nil
+      if args.empty? && block_given?
+        source = yield
+      elsif args.size == 1
+        source = args[0]
+      elsif args.empty?
+        return # No-op
       else
-        x = x.right
+        raise ArgumentError, "wrong number of arguments (given #{args.size}, expected 0..2)"
+      end
+
+      return if source.nil?
+
+      unless source.respond_to?(:each)
+        raise ArgumentError, "Source must be iterable"
+      end
+
+      source.each do |*pair|
+        key, value = nil, nil
+        if pair.size == 1 && pair[0].is_a?(Array)
+          key, value = pair[0]
+          raise ArgumentError, "Invalid pair size: #{pair[0].size} (expected 2)" unless pair[0].size == 2
+        elsif pair.size == 2
+          key, value = pair
+        else
+          raise ArgumentError, "Invalid pair format: #{pair.inspect}"
+        end
+        insert_entry(key, value, overwrite: overwrite)
       end
     end
-    z = allocate_node(key, value, Node::RED, @nil_node, @nil_node, @nil_node)
-    z.parent = y
-    if y == @nil_node
-      @root = z
-    elsif (key <=> y.key) < 0
-      y.left = z
-    else
-      y.right = z
-    end
-    z.left = @nil_node
-    z.right = @nil_node
-    z.color = Node::RED
-    insert_fixup(z)
-    @size += 1
-    
-    if @min_node == @nil_node || (key <=> @min_node.key) < 0
-      @min_node = z
-    end
-    
-    @hash_index[key] = z  # Add to hash index
-    true
   end
   alias_method :[]=, :insert
 
@@ -518,8 +517,58 @@ class RBTree
     true
   end
 
-  # @!visibility private
-  private
+  # @!visibility protected
+  protected
+
+  # Inserts a single key-value pair.
+  #
+  # @param key [Object] the key to insert
+  # @param value [Object] the value to associate with the key
+  # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
+  # @return [Boolean, nil] true if inserted/updated, nil if key exists and overwrite is false
+  def insert_entry(key, value, overwrite: true)
+    if (node = @hash_index[key])
+      return nil unless overwrite
+      node.value = value
+      return true
+    end
+    y = @nil_node
+    x = @root
+    while x != @nil_node
+      y = x
+      cmp = key <=> x.key
+      if cmp == 0
+        return nil unless overwrite
+        x.value = value
+        return true
+      elsif cmp < 0
+        x = x.left
+      else
+        x = x.right
+      end
+    end
+    z = allocate_node(key, value, Node::RED, @nil_node, @nil_node, @nil_node)
+    z.parent = y
+    if y == @nil_node
+      @root = z
+    elsif (key <=> y.key) < 0
+      y.left = z
+    else
+      y.right = z
+    end
+    z.left = @nil_node
+    z.right = @nil_node
+    z.color = Node::RED
+    insert_fixup(z)
+    @size += 1
+    
+    if @min_node == @nil_node || (key <=> @min_node.key) < 0
+      @min_node = z
+    end
+    
+    @hash_index[key] = z  # Add to hash index
+    true
+  end
 
   # Traverses the tree in ascending order (in-order traversal).
   #
@@ -1377,12 +1426,13 @@ class MultiRBTree < RBTree
   #
   # @param key [Object] the key (must implement <=>)
   # @param value [Object] the value to insert
+  # @param overwrite [Boolean] ignored for MultiRBTree which always appends
   # @return [Boolean] always returns true
   # @example
   #   tree = MultiRBTree.new
   #   tree.insert(1, 'first')
   #   tree.insert(1, 'second')  # adds another value for key 1
-  def insert(key, value)
+  def insert_entry(key, value, **)
     if (node = @hash_index[key])
       node.value << value
       @size += 1
@@ -1527,7 +1577,8 @@ class MultiRBTree < RBTree
     @hash_index[key]&.value&.each { |v| yield v }
   end
 
-  private
+  # @!visibility protected
+  protected
 
   def traverse_range_asc(...)
     super { |k, vals| vals.each { |v| yield k, v } }

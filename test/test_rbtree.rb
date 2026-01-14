@@ -828,6 +828,118 @@ class TestRBTree < Minitest::Test
       assert_equal expected_keys, actual_keys
     end
   end
+
+  # ============================================================
+  # Bulk Insert Tests
+  # ============================================================
+
+  def test_bulk_insert_key_value
+    @tree.insert(1, "one")
+    assert_equal 1, @tree.size
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_key_value_overwrite_false
+    @tree.insert(1, "one")
+    @tree.insert(1, "uno", overwrite: false)
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_hash
+    @tree.insert({1 => "one", 2 => "two"})
+    assert_equal 2, @tree.size
+    assert_equal "one", @tree[1]
+    assert_equal "two", @tree[2]
+  end
+
+  def test_bulk_insert_hash_overwrite_false
+    @tree.insert({1 => "one"})
+    @tree.insert({1 => "uno", 2 => "two"}, overwrite: false)
+    assert_equal "one", @tree[1]
+    assert_equal "two", @tree[2]
+  end
+
+  def test_bulk_insert_array_pairs
+    @tree.insert([[1, "one"], [2, "two"]])
+    assert_equal 2, @tree.size
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_array_pairs_duplicates_overwrite_true
+    @tree.insert([[1, "one"], [1, "uno"]])
+    assert_equal 1, @tree.size
+    assert_equal "uno", @tree[1]
+  end
+
+  def test_bulk_insert_array_pairs_duplicates_overwrite_false
+    @tree.insert([[1, "one"], [1, "uno"]], overwrite: false)
+    assert_equal 1, @tree.size
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_enumerator
+    enum = {1 => "one", 2 => "two"}.each
+    @tree.insert(enum)
+    assert_equal 2, @tree.size
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_block
+    @tree.insert { [[1, "one"]] }
+    assert_equal 1, @tree.size
+    assert_equal "one", @tree[1]
+  end
+
+  def test_bulk_insert_nil_noop
+    @tree.insert(nil)
+    assert_empty @tree
+  end
+
+  def test_bulk_insert_no_args_noop
+    @tree.insert
+    assert_empty @tree
+  end
+
+  def test_bulk_insert_block_nil_noop
+    @tree.insert { nil }
+    assert_empty @tree
+  end
+
+  def test_bulk_insert_error_non_iterable
+    assert_raises(ArgumentError) { @tree.insert(123) }
+  end
+
+  def test_bulk_insert_error_flat_array
+    assert_raises(ArgumentError) { @tree.insert([1]) }
+  end
+
+  def test_bulk_insert_error_invalid_pair_size
+    assert_raises(ArgumentError) { @tree.insert([[1]]) }
+  end
+
+  def test_bulk_insert_error_too_many_args
+    assert_raises(ArgumentError) { @tree.insert(1, 2, 3) }
+  end
+
+  def test_initialize_bulk_hash
+    tree = RBTree.new({1 => "one"})
+    assert_equal "one", tree[1]
+  end
+
+  def test_initialize_bulk_array
+    tree = RBTree.new([[1, "one"]])
+    assert_equal "one", tree[1]
+  end
+
+  def test_initialize_block
+    tree = RBTree.new { [[1, "one"]] }
+    assert_equal "one", tree[1]
+  end
+
+  def test_initialize_overwrite_false
+    tree = RBTree.new([[1, "one"], [1, "uno"]], overwrite: false)
+    assert_equal "one", tree[1]
+  end
 end
 
 # ============================================================
@@ -1284,5 +1396,27 @@ class TestMultiRBTree < Minitest::Test
     # pop removes last value, so max_99 through max_50 are removed, leaving max_49 as the last
     assert_equal [100, 'max_49'], @tree.max(last: true)
     assert @tree.valid?
+  end
+
+  # ============================================================
+  # Bulk Insert Tests
+  # ============================================================
+
+  def test_multi_initialize_bulk_array_duplicates
+    tree = MultiRBTree.new([[1, "one"], [1, "uno"]])
+    assert_equal 2, tree.size
+    assert_equal ["one", "uno"], tree.get_all(1).to_a
+  end
+
+  def test_multi_insert_hash
+    @tree.insert({1 => "one", 2 => "two"})
+    assert_equal 2, @tree.size
+  end
+
+  def test_multi_insert_ignores_overwrite
+    @tree.insert({1 => "one"}, overwrite: false)
+    @tree.insert({1 => "uno"}, overwrite: false)
+    assert_equal 2, @tree.size
+    assert_equal ["one", "uno"], @tree.get_all(1).to_a
   end
 end

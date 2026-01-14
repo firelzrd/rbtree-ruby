@@ -2,8 +2,7 @@
 
 🌍 *[English](README.md) | [日本語](README.ja.md)*
 
-Red-Black Tree（赤黒木）データ構造のピュアRuby実装です。挿入、削除、検索操作がO(log n)の時間計算量で実行できる、
-効率的な順序付きキーバリューストレージを提供します。
+Red-Black Tree（赤黒木）データ構造のピュアRuby実装です。挿入、削除、検索操作がO(log n)の時間計算量で実行できる、効率的な順序付きキーバリューストレージを提供します。
 
 ## 特徴
 
@@ -43,13 +42,18 @@ require 'rbtree'
 # 空のツリーを作成
 tree = RBTree.new
 
-# データで初期化
+# データで初期化（バルク挿入）
 tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
 tree = RBTree[[5, 'five'], [4, 'four']]
+tree = RBTree.new do # ブロック初期化
+  data_source.each { |data| [data.time, data.content] } 
+end
 
 # 値の挿入と取得
 tree.insert(10, 'ten')
 tree[20] = 'twenty'
+# バルク挿入
+tree.insert({30 => 'thirty', 40 => 'forty'})
 puts tree[10]  # => "ten"
 
 # ソート順でイテレーション
@@ -138,6 +142,8 @@ tree.nearest(8)   # => [10, "ten"]
 
 ### 前後キー検索
 
+ツリーの中で次のキーまたは前のキーを検索します。
+
 ```ruby
 tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
 
@@ -202,8 +208,8 @@ tree.max(last: true)      # => [2, "b"]      (最大キーの最後の値)
 
 - `insert(key, value)` - O(log n)
 - `delete(key)` - O(log n)
-- `get(key)` / `[]` - **O(1)** (ハイブリッドハッシュインデックス)
-- `has_key?` - **O(1)** (ハイブリッドハッシュインデックス)
+- `get(key)` / `[]` - **O(1)** (内部ハッシュインデックスによる超高速アクセス)
+- `has_key?` - **O(1)** (内部ハッシュインデックスによる超高速チェック)
 - `min` - **O(1)**
 - `max` - O(log n)
 - `shift` / `pop` - O(log n)
@@ -227,7 +233,7 @@ RBTreeは内部的な**メモリプール**を使用してノードオブジェ�
 | **範囲クエリ** | **O(log n + k)** | O(n) フィルター | **〜540倍高速** | 部分木へ直接ジャンプ vs 全件スキャン |
 | **最小値抽出** | **O(log n)** | O(n) 検索 | **〜160倍高速** | 連続的なリバランス vs 全件スキャン |
 | **ソート済みイテレーション** | **O(n)** | O(n log n) | **無料** | 常にソート済み vs 明示的な`sort` |
-| **キー検索** | **O(1)** | O(1) | **同等** | ハイブリッドハッシュインデックス |
+| **キー検索** | **O(1)** | O(1) | **同等** | **ハイブリッドハッシュインデックスにより、Hashと同等のO(1)検索速度を実現** |
 
 ### RBTreeを使うべき場面
 
