@@ -174,6 +174,25 @@ tree.lt(3).first                   # => [1, "one"] (lazy, no array created)
 tree.gt(0).lazy.take(2).to_a  # => [[1, "one"], [2, "two"]] (only computes first 2)
 ```
 
+### Conversion and Merging
+
+Seamlessly convert to standard Ruby objects or merge other collections:
+
+```ruby
+tree = RBTree.new({1 => 'one', 2 => 'two'})
+
+# Convert to Array (via Enumerable)
+tree.to_a  # => [[1, "one"], [2, "two"]]
+
+# Convert to Hash
+tree.to_h  # => {1 => "one", 2 => "two"}
+
+# Merge another tree, hash, or enumerable
+other = {3 => 'three'}
+tree.merge!(other)
+tree.size  # => 3
+```
+
 ### MultiRBTree Value Array Access
 
 For keys with multiple values, choose which value to access:

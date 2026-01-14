@@ -174,6 +174,25 @@ tree.lt(3).first                   # => [1, "one"] (遅延評価、配列は作�
 tree.gt(0).lazy.take(2).to_a  # => [[1, "one"], [2, "two"]] (最初の2件のみ計算)
 ```
 
+### 変換と結合
+
+標準のRubyオブジェクトへの変換や、他のコレクションとの結合も簡単です:
+
+```ruby
+tree = RBTree.new({1 => 'one', 2 => 'two'})
+
+# 配列への変換（Enumerable経由）
+tree.to_a  # => [[1, "one"], [2, "two"]]
+
+# ハッシュへの変換
+tree.to_h  # => {1 => "one", 2 => "two"}
+
+# 他のツリー、ハッシュ、またはEnumerableの結合
+other = {3 => 'three'}
+tree.merge!(other)
+tree.size  # => 3
+```
+
 ### MultiRBTree 値配列アクセス
 
 複数の値を持つキーで、どの値にアクセスするか選択:

@@ -940,6 +940,71 @@ class TestRBTree < Minitest::Test
     tree = RBTree.new([[1, "one"], [1, "uno"]], overwrite: false)
     assert_equal "one", tree[1]
   end
+
+  # ============================================================
+  # Conversion and Merging Tests
+  # ============================================================
+
+  def test_to_h
+    @tree[1] = 'one'
+    @tree[2] = 'two'
+    
+    expected = { 1 => 'one', 2 => 'two' }
+    assert_equal expected, @tree.to_h
+    
+    # Hash returned should be independent
+    h = @tree.to_h
+    h[3] = 'three'
+    refute @tree.has_key?(3)
+  end
+
+  def test_merge_bang
+    @tree[1] = 'original_one'
+    @tree[2] = 'original_two'
+    
+    other = { 2 => 'new_two', 3 => 'new_three' }
+    
+    @tree.merge!(other)
+    
+    assert_equal 3, @tree.size
+    assert_equal 'original_one', @tree[1]
+    assert_equal 'new_two', @tree[2]  # Overwritten
+    assert_equal 'new_three', @tree[3]
+  end
+
+  def test_merge_bang_overwrite_false
+    @tree[1] = 'original_one'
+    
+    other = { 1 => 'new_one', 2 => 'new_two' }
+    
+    @tree.merge!(other, overwrite: false)
+    
+    assert_equal 'original_one', @tree[1] # Not overwritten
+    assert_equal 'new_two', @tree[2]      # Added
+  end
+
+  def test_merge_bang_return_self
+    other = { 1 => 'one' }
+    assert_same @tree, @tree.merge!(other)
+  end
+
+  def test_merge_from_another_rbtree
+    other_tree = RBTree.new({ 2 => 'two', 3 => 'three' })
+    @tree[1] = 'one'
+    
+    @tree.merge!(other_tree)
+    
+    assert_equal 'one', @tree[1]
+    assert_equal 'two', @tree[2]
+    assert_equal 'three', @tree[3]
+  end
+
+  def test_merge_multirbtree_raises_error
+    multi = MultiRBTree.new
+    multi.insert(1, 'val')
+    
+    assert_raises(ArgumentError) { @tree.merge!(multi) }
+  end
 end
 
 # ============================================================
@@ -1418,5 +1483,49 @@ class TestMultiRBTree < Minitest::Test
     @tree.insert({1 => "uno"}, overwrite: false)
     assert_equal 2, @tree.size
     assert_equal ["one", "uno"], @tree.values(1).to_a
+  end
+
+  # ============================================================
+  # Conversion and Merging Tests
+  # ============================================================
+
+  def test_to_h
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+
+    expected = { 1 => ['a', 'b'], 2 => ['c'] }
+    assert_equal expected, @tree.to_h
+  end
+
+  def test_merge_bang
+    @tree.insert(1, 'a')
+    
+    other = { 1 => 'b', 2 => 'c' }
+    @tree.merge!(other)
+    
+    # In MultiRBTree, merging a hash (where values are scalar) appends them
+    # result: 1 => ['a', 'b'], 2 => ['c']
+    assert_equal ['a', 'b'], @tree.values(1).to_a
+    assert_equal ['c'], @tree.values(2).to_a
+  end
+
+  def test_merge_bang_from_another_multirbtree
+    @tree.insert(1, 'a')
+    
+    other = MultiRBTree.new
+    other.insert(1, 'b')
+    other.insert(1, 'c')
+    other.insert(2, 'd')
+    
+    @tree.merge!(other)
+    
+    # 1 => a, b, c; 2 => d
+    assert_equal ['a', 'b', 'c'], @tree.values(1).to_a
+    assert_equal ['d'], @tree.values(2).to_a
+  end
+
+  def test_merge_bang_returns_self
+    assert_same @tree, @tree.merge!({})
   end
 end

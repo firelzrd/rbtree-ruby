@@ -5,9 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-15
+
+### Added
+- **`to_h`**: Added `to_h` method to `RBTree` and `MultiRBTree` for efficient conversion to Hash.
+- **`merge!`**: Added `merge!` method to `RBTree` and `MultiRBTree`.
+  - `RBTree#merge!`: Supports `overwrite` option (default: `true`). Raises `ArgumentError` if merging a `MultiRBTree` (incompatible value structures).
+  - `MultiRBTree#merge!`: Always appends values from the source.
+
 ## [0.3.0] - 2026-01-15
 
-### Changed
 ### API Changes (Method Renaming & Deprecation)
 > [!WARNING]
 > The public API has been refactored to improve consistency. The following methods have been renamed.

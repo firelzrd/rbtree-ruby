@@ -107,6 +107,11 @@ class RBTree
     end
   end
 
+  # Returns a Hash containing all key-value pairs from the tree.
+  #
+  # @return [Hash] a new Hash with the tree's contents
+  def to_h = @hash_index.transform_values(&:value)
+
   # Checks if the tree is empty.
   #
   # @return [Boolean] true if the tree contains no elements, false otherwise
@@ -335,6 +340,19 @@ class RBTree
     end
   end
   alias :[]= :insert
+  
+  # Merges the contents of another tree, hash, or enumerable into this tree.
+  #
+  # @param other [RBTree, Hash, Enumerable] the source to merge from
+  # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
+  # @return [RBTree] self
+  def merge!(other, overwrite: true)
+    if defined?(MultiRBTree) && other.is_a?(MultiRBTree)
+      raise ArgumentError, "Cannot merge MultiRBTree into RBTree"
+    end
+    insert(other, overwrite: overwrite)
+    self
+  end
 
   # Deletes the key-value pair with the specified key.
   #
@@ -1548,61 +1566,15 @@ class MultiRBTree < RBTree
   #   tree.succ(4)   # => [5, "five"]
   def succ(key, last: false) = (pair = super(key)) && [pair[0], pair[1].send(last ? :last : :first)]
 
-  # Inserts a value for the given key.
+  # Merges the contents of another tree, hash, or enumerable into this tree.
   #
-  # If the key already exists, the value is appended to its list.
-  # If the key doesn't exist, a new node is created.
+  # Appends values from the other source to the existing values for each key.
   #
-  # @param key [Object] the key (must implement <=>)
-  # @param value [Object] the value to insert
-  # @param overwrite [Boolean] ignored for MultiRBTree which always appends
-  # @return [Boolean] always returns true
-  # @example
-  #   tree = MultiRBTree.new
-  #   tree.insert(1, 'first')
-  #   tree.insert(1, 'second')  # adds another value for key 1
-  def insert_entry(key, value, **)
-    if (node = @hash_index[key])
-      node.value << value
-      @value_count += 1
-      return true
-    end
-    y = @nil_node
-    x = @root
-    while x != @nil_node
-      y = x
-      cmp = key <=> x.key
-      if cmp == 0
-        x.value << value
-        @value_count += 1
-        return true
-      elsif cmp < 0
-        x = x.left
-      else
-        x = x.right
-      end
-    end
-    z = allocate_node(key, [value], Node::RED, @nil_node, @nil_node, @nil_node)
-    z.parent = y
-    if y == @nil_node
-      @root = z
-    elsif (key <=> y.key) < 0
-      y.left = z
-    else
-      y.right = z
-    end
-    z.left = @nil_node
-    z.right = @nil_node
-    z.color = Node::RED
-    insert_fixup(z)
-    @value_count += 1
-    
-    if @min_node == @nil_node || (key <=> @min_node.key) < 0
-      @min_node = z
-    end
-    
-    @hash_index[key] = z  # Add to hash index
-    true
+  # @param other [RBTree, Hash, Enumerable] the source to merge from
+  # @return [MultiRBTree] self
+  def merge!(other)
+    insert(other)
+    self
   end
 
   # Deletes a single value for the specified key.
@@ -1691,6 +1663,63 @@ class MultiRBTree < RBTree
 
   # @!visibility private
   private
+
+  # Inserts a value for the given key.
+  #
+  # If the key already exists, the value is appended to its list.
+  # If the key doesn't exist, a new node is created.
+  #
+  # @param key [Object] the key (must implement <=>)
+  # @param value [Object] the value to insert
+  # @param overwrite [Boolean] ignored for MultiRBTree which always appends
+  # @return [Boolean] always returns true
+  # @example
+  #   tree = MultiRBTree.new
+  #   tree.insert(1, 'first')
+  #   tree.insert(1, 'second')  # adds another value for key 1
+  def insert_entry(key, value, **)
+    if (node = @hash_index[key])
+      node.value << value
+      @value_count += 1
+      return true
+    end
+    y = @nil_node
+    x = @root
+    while x != @nil_node
+      y = x
+      cmp = key <=> x.key
+      if cmp == 0
+        x.value << value
+        @value_count += 1
+        return true
+      elsif cmp < 0
+        x = x.left
+      else
+        x = x.right
+      end
+    end
+    z = allocate_node(key, [value], Node::RED, @nil_node, @nil_node, @nil_node)
+    z.parent = y
+    if y == @nil_node
+      @root = z
+    elsif (key <=> y.key) < 0
+      y.left = z
+    else
+      y.right = z
+    end
+    z.left = @nil_node
+    z.right = @nil_node
+    z.color = Node::RED
+    insert_fixup(z)
+    @value_count += 1
+    
+    if @min_node == @nil_node || (key <=> @min_node.key) < 0
+      @min_node = z
+    end
+    
+    @hash_index[key] = z  # Add to hash index
+    true
+  end
 
   # Traverses the tree in ascending order, yielding each key-value pair.
   #
