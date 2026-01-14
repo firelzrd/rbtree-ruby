@@ -108,11 +108,11 @@ tree.insert(2, 'two')
 tree.size  # => 4 (キーバリューペアの総数)
 
 # 最初の値を取得
-tree.get(1)      # => "first one"
+tree.value(1)      # => "first one"
 tree[1]          # => "first one"
 
 # キーの全ての値を取得（Enumeratorを返す）
-tree.get_all(1).to_a  # => ["first one", "second one", "third one"]
+tree.values(1).to_a  # => ["first one", "second one", "third one"]
 
 # 全キーバリューペアをイテレーション
 tree.each { |k, v| puts "#{k}: #{v}" }
@@ -123,11 +123,11 @@ tree.each { |k, v| puts "#{k}: #{v}" }
 # 2: two
 
 # 最初の値のみ削除
-tree.delete_one(1)  # => "first one"
-tree.get(1)         # => "second one"
+tree.delete_value(1)  # => "first one"
+tree.value(1)         # => "second one"
 
 # キーの全ての値を削除
-tree.delete(1)      # 残りの値を全て削除
+tree.delete_key(1)      # 残りの値を全て削除
 ```
 
 ### 最近傍キー検索
@@ -185,15 +185,15 @@ tree.insert(1, 'second')
 tree.insert(1, 'third')
 
 # 最初または最後の値にアクセス
-tree.get(1)               # => "first"
-tree.get(1, last: true)   # => "third"
-tree.get_first(1)         # => "first"
-tree.get_last(1)          # => "third"
+tree.value(1)               # => "first"
+tree.value(1, last: true)   # => "third"
+tree.first_value(1)         # => "first"
+tree.last_value(1)          # => "third"
 
 # どちらの端からも削除可能
-tree.delete_first(1)      # => "first"
-tree.delete_last(1)       # => "third"  
-tree.get(1)               # => "second"
+tree.delete_first_value(1)      # => "first"
+tree.delete_last_value(1)       # => "third"  
+tree.value(1)               # => "second"
 
 # min/maxの:lastオプション
 tree.insert(2, 'a')
@@ -208,7 +208,7 @@ tree.max(last: true)      # => [2, "b"]      (最大キーの最後の値)
 
 - `insert(key, value)` - O(log n)
 - `delete(key)` - O(log n)
-- `get(key)` / `[]` - **O(1)** (内部ハッシュインデックスによる超高速アクセス)
+- `value(key)` / `[]` - **O(1)** (内部ハッシュインデックスによる超高速アクセス)
 - `has_key?` - **O(1)** (内部ハッシュインデックスによる超高速チェック)
 - `min` - **O(1)**
 - `max` - O(log n)

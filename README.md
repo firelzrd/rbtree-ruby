@@ -108,11 +108,11 @@ tree.insert(2, 'two')
 tree.size  # => 4 (total number of key-value pairs)
 
 # Get first value
-tree.get(1)      # => "first one"
+tree.value(1)      # => "first one"
 tree[1]          # => "first one"
 
 # Get all values for a key (returns Enumerator)
-tree.get_all(1).to_a  # => ["first one", "second one", "third one"]
+tree.values(1).to_a  # => ["first one", "second one", "third one"]
 
 # Iterate over all key-value pairs
 tree.each { |k, v| puts "#{k}: #{v}" }
@@ -123,11 +123,11 @@ tree.each { |k, v| puts "#{k}: #{v}" }
 # 2: two
 
 # Delete only first value
-tree.delete_one(1)  # => "first one"
-tree.get(1)         # => "second one"
+tree.delete_value(1)  # => "first one"
+tree.value(1)         # => "second one"
 
 # Delete all values for a key
-tree.delete(1)      # removes all remaining values
+tree.delete_key(1)      # removes all remaining values
 ```
 
 ### Nearest Key Search
@@ -185,15 +185,15 @@ tree.insert(1, 'second')
 tree.insert(1, 'third')
 
 # Access first or last value
-tree.get(1)               # => "first"
-tree.get(1, last: true)   # => "third"
-tree.get_first(1)         # => "first"
-tree.get_last(1)          # => "third"
+tree.value(1)               # => "first"
+tree.value(1, last: true)   # => "third"
+tree.first_value(1)         # => "first"
+tree.last_value(1)          # => "third"
 
 # Delete from either end
-tree.delete_first(1)      # => "first"
-tree.delete_last(1)       # => "third"  
-tree.get(1)               # => "second"
+tree.delete_first_value(1)      # => "first"
+tree.delete_last_value(1)       # => "third"  
+tree.value(1)               # => "second"
 
 # min/max with :last option
 tree.insert(2, 'a')
@@ -208,7 +208,7 @@ All major operations run in **O(log n)** time:
 
 - `insert(key, value)` - O(log n)
 - `delete(key)` - O(log n)
-- `get(key)` / `[]` - **O(1)** (hybrid hash index)
+- `value(key)` / `[]` - **O(1)** (hybrid hash index)
 - `has_key?` - **O(1)** (hybrid hash index)
 - `min` - **O(1)**
 - `max` - O(log n)

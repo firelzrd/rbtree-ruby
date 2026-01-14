@@ -52,9 +52,9 @@ class TestRBTree < Minitest::Test
     assert_nil @tree.max
     assert_nil @tree.shift
     assert_nil @tree.pop
-    assert_nil @tree.get(1)
+    assert_nil @tree.value(1)
     assert_nil @tree[1]
-    assert_nil @tree.delete(1)
+    assert_nil @tree.delete_key(1)
     assert_nil @tree.prev(1)
     assert_nil @tree.succ(1)
     assert_nil @tree.nearest(1)
@@ -124,7 +124,7 @@ class TestRBTree < Minitest::Test
     @tree.insert(2, 'two')
     
     assert_equal 'one', @tree[1]
-    assert_equal 'two', @tree.get(2)
+    assert_equal 'two', @tree.value(2)
     assert_nil @tree[3]
 
     @tree[1] = 'ONE'
@@ -168,22 +168,22 @@ class TestRBTree < Minitest::Test
     @tree[2] = 'two'
     @tree[3] = 'three'
 
-    assert_equal 'two', @tree.delete(2)
+    assert_equal 'two', @tree.delete_key(2)
     assert_nil @tree[2]
     assert_equal 2, @tree.size
 
-    assert_nil @tree.delete(999)
+    assert_nil @tree.delete_key(999)
     
     @tree.clear
     @tree[1] = 'one'
-    assert_equal 'one', @tree.delete(1)
+    assert_equal 'one', @tree.delete_key(1)
     assert_empty @tree
   end
 
   def test_delete_min_element
     (1..10).each { |i| @tree[i] = "val#{i}" }
     
-    deleted = @tree.delete(1)
+    deleted = @tree.delete_key(1)
     assert_equal 'val1', deleted
     assert_equal [2, 'val2'], @tree.min
     assert_equal 9, @tree.size
@@ -193,7 +193,7 @@ class TestRBTree < Minitest::Test
   def test_delete_max_element
     (1..10).each { |i| @tree[i] = "val#{i}" }
     
-    deleted = @tree.delete(10)
+    deleted = @tree.delete_key(10)
     assert_equal 'val10', deleted
     assert_equal [9, 'val9'], @tree.max
     assert_equal 9, @tree.size
@@ -207,7 +207,7 @@ class TestRBTree < Minitest::Test
     initial_size = @tree.size
     root_key = @tree.to_a[@tree.size / 2][0]
     
-    @tree.delete(root_key)
+    @tree.delete_key(root_key)
     assert_equal initial_size - 1, @tree.size
     assert @tree.valid?
   end
@@ -217,7 +217,7 @@ class TestRBTree < Minitest::Test
     keys.each { |k| @tree[k] = "val#{k}" }
     
     keys.shuffle.each do |k|
-      @tree.delete(k)
+      @tree.delete_key(k)
       assert @tree.valid?, "Tree should be valid after deleting key #{k}"
     end
     
@@ -446,7 +446,7 @@ class TestRBTree < Minitest::Test
     (1..5).each { |i| @tree[i] = i.to_s }
     
     @tree.lt(4, safe: true) do |k, v|
-      @tree.delete(k) if k.even?
+      @tree.delete_key(k) if k.even?
     end
 
     assert_nil @tree[2]
@@ -548,7 +548,7 @@ class TestRBTree < Minitest::Test
     (1..10).each { |i| @tree[i] = "val#{i}" }
     
     @tree.each(safe: true) do |k, v|
-      @tree.delete(k)
+      @tree.delete_key(k)
     end
     
     assert_empty @tree
@@ -560,7 +560,7 @@ class TestRBTree < Minitest::Test
     visited = []
     @tree.each(safe: true) do |k, v|
       visited << k
-      @tree.delete(k + 1) if k.odd? && @tree.has_key?(k + 1)
+      @tree.delete_key(k + 1) if k.odd? && @tree.has_key?(k + 1)
     end
     
     # Odd keys should be visited, even keys may or may not depending on when deleted
@@ -648,7 +648,7 @@ class TestRBTree < Minitest::Test
     @tree[1] = 'one'
     assert @tree.has_key?(1)
     
-    @tree.delete(1)
+    @tree.delete_key(1)
     refute @tree.has_key?(1)
   end
 
@@ -703,7 +703,7 @@ class TestRBTree < Minitest::Test
     
     keys = (1..100).to_a.shuffle
     keys.each do |k|
-      @tree.delete(k)
+      @tree.delete_key(k)
       assert @tree.valid?, "Tree should be valid after deleting #{k}"
     end
   end
@@ -746,7 +746,7 @@ class TestRBTree < Minitest::Test
     assert @tree.valid?
     
     # Sequential delete
-    (1..n).each { |i| @tree.delete(i) }
+    (1..n).each { |i| @tree.delete_key(i) }
     assert_empty @tree
     assert @tree.valid?
   end
@@ -762,7 +762,7 @@ class TestRBTree < Minitest::Test
     
     # Random delete
     keys.shuffle!
-    keys.each { |k| @tree.delete(k) }
+    keys.each { |k| @tree.delete_key(k) }
     assert_empty @tree
     assert @tree.valid?
   end
@@ -777,7 +777,7 @@ class TestRBTree < Minitest::Test
       
       if i > 100 && rand < 0.5
         to_delete = inserted.sample
-        @tree.delete(to_delete)
+        @tree.delete_key(to_delete)
         inserted.delete_at(inserted.index(to_delete) || inserted.length)
       end
     end
@@ -962,15 +962,15 @@ class TestMultiRBTree < Minitest::Test
     assert_nil @tree.max
     assert_nil @tree.shift
     assert_nil @tree.pop
-    assert_nil @tree.get(1)
-    assert_nil @tree.get_first(1)
-    assert_nil @tree.get_last(1)
-    assert_nil @tree.delete(1)
-    assert_nil @tree.delete_one(1)
+    assert_nil @tree.value(1)
+    assert_nil @tree.first_value(1)
+    assert_nil @tree.last_value(1)
+    assert_nil @tree.delete_key(1)
+    assert_nil @tree.delete_value(1)
     
-    # get_all returns nil for non-existent
+    # values returns nil for non-existent
     result = []
-    @tree.get_all(1) { |v| result << v }
+    @tree.values(1) { |v| result << v }
     assert_equal [], result
   end
 
@@ -984,17 +984,17 @@ class TestMultiRBTree < Minitest::Test
     @tree.insert(2, 'apple')
 
     assert_equal 3, @tree.size
-    assert_equal 'first', @tree.get(1)
-    assert_equal ['first', 'second'], @tree.get_all(1).to_a
+    assert_equal 'first', @tree.value(1)
+    assert_equal ['first', 'second'], @tree.values(1).to_a
   end
 
   def test_many_values_same_key
     100.times { |i| @tree.insert(1, "val#{i}") }
     
     assert_equal 100, @tree.size
-    assert_equal 'val0', @tree.get_first(1)
-    assert_equal 'val99', @tree.get_last(1)
-    assert_equal 100, @tree.get_all(1).to_a.size
+    assert_equal 'val0', @tree.first_value(1)
+    assert_equal 'val99', @tree.last_value(1)
+    assert_equal 100, @tree.values(1).to_a.size
     assert @tree.valid?
   end
 
@@ -1002,32 +1002,32 @@ class TestMultiRBTree < Minitest::Test
   # Get Operations
   # ============================================================
 
-  def test_get_last_first
+  def test_value_first_last
     @tree.insert(1, 'first')
     @tree.insert(1, 'second')
 
-    assert_equal 'first', @tree.get_first(1)
-    assert_equal 'second', @tree.get_last(1)
+    assert_equal 'first', @tree.first_value(1)
+    assert_equal 'second', @tree.last_value(1)
     
-    assert_equal 'first', @tree.get(1)
-    assert_equal 'second', @tree.get(1, last: true)
+    assert_equal 'first', @tree.value(1)
+    assert_equal 'second', @tree.value(1, last: true)
   end
 
-  def test_get_all_enumerator
+  def test_values_enumerator
     @tree.insert(1, 'a')
     @tree.insert(1, 'b')
     @tree.insert(1, 'c')
     
-    enum = @tree.get_all(1)
+    enum = @tree.values(1)
     assert_instance_of Enumerator, enum
     assert_equal ['a', 'b', 'c'], enum.to_a
   end
 
-  def test_get_all_empty_key
+  def test_values_empty_key
     @tree.insert(1, 'val')
     
     result = []
-    @tree.get_all(999) { |v| result << v }
+    @tree.values(999) { |v| result << v }
     assert_equal [], result
   end
 
@@ -1035,55 +1035,55 @@ class TestMultiRBTree < Minitest::Test
   # Delete Operations
   # ============================================================
 
-  def test_delete_one_all
+  def test_delete_value_all
     @tree.insert(1, 'first')
     @tree.insert(1, 'second')
     @tree.insert(1, 'third')
 
-    assert_equal 'first', @tree.delete_one(1)
-    assert_equal ['second', 'third'], @tree.get_all(1).to_a
+    assert_equal 'first', @tree.delete_value(1)
+    assert_equal ['second', 'third'], @tree.values(1).to_a
     assert_equal 2, @tree.size
 
-    assert_equal 'third', @tree.delete_last(1)
-    assert_equal ['second'], @tree.get_all(1).to_a
+    assert_equal 'third', @tree.delete_last_value(1)
+    assert_equal ['second'], @tree.values(1).to_a
     
     @tree.insert(1, 'fourth')
-    @tree.delete(1)
-    assert_nil @tree.get(1)
+    @tree.delete_key(1)
+    assert_nil @tree.value(1)
     assert_equal 0, @tree.size
   end
 
-  def test_delete_first_last
+  def test_delete_first_value_last_value
     @tree.insert(1, 'a')
     @tree.insert(1, 'b')
     @tree.insert(1, 'c')
     
-    assert_equal 'a', @tree.delete_first(1)
-    assert_equal 'c', @tree.delete_last(1)
-    assert_equal ['b'], @tree.get_all(1).to_a
+    assert_equal 'a', @tree.delete_first_value(1)
+    assert_equal 'c', @tree.delete_last_value(1)
+    assert_equal ['b'], @tree.values(1).to_a
     assert_equal 1, @tree.size
   end
 
-  def test_delete_one_order
+  def test_delete_value_order
     @tree.insert(1, 'a')
     @tree.insert(1, 'b')
     @tree.insert(1, 'c')
     
     # Default deletes first
-    assert_equal 'a', @tree.delete_one(1)
-    assert_equal 'b', @tree.delete_one(1)
-    assert_equal 'c', @tree.delete_one(1)
-    assert_nil @tree.delete_one(1)
+    assert_equal 'a', @tree.delete_value(1)
+    assert_equal 'b', @tree.delete_value(1)
+    assert_equal 'c', @tree.delete_value(1)
+    assert_nil @tree.delete_value(1)
     assert_empty @tree
   end
 
   def test_delete_nonexistent
     @tree.insert(1, 'val')
     
-    assert_nil @tree.delete(999)
-    assert_nil @tree.delete_one(999)
-    assert_nil @tree.delete_first(999)
-    assert_nil @tree.delete_last(999)
+    assert_nil @tree.delete_key(999)
+    assert_nil @tree.delete_value(999)
+    assert_nil @tree.delete_first_value(999)
+    assert_nil @tree.delete_last_value(999)
     assert_equal 1, @tree.size
   end
 
@@ -1154,7 +1154,7 @@ class TestMultiRBTree < Minitest::Test
     assert_equal ['a1', 'a2'], res
     
     @tree.each(safe: true) do |k, v|
-      @tree.delete(2)
+      @tree.delete_key(2)
     end
   end
 
@@ -1167,7 +1167,7 @@ class TestMultiRBTree < Minitest::Test
     visited = []
     @tree.each(safe: true) do |k, v|
       visited << [k, v]
-      @tree.delete(2) if k == 1
+      @tree.delete_key(2) if k == 1
     end
     
     # Key 2 deleted, but iteration continues
@@ -1352,10 +1352,10 @@ class TestMultiRBTree < Minitest::Test
       case op
       when 0 # insert
         @tree.insert(key, rand(1000))
-      when 1 # delete_one
-        @tree.delete_one(key)
+      when 1 # delete_value
+        @tree.delete_value(key)
       when 2 # delete all
-        @tree.delete(key) if rand < 0.2
+        @tree.delete_key(key) if rand < 0.2
       end
     end
     
@@ -1369,8 +1369,8 @@ class TestMultiRBTree < Minitest::Test
     assert @tree.valid?
     
     # Delete some from each
-    50.times { @tree.delete_one(1) }
-    50.times { @tree.delete_one(2) }
+    50.times { @tree.delete_value(1) }
+    50.times { @tree.delete_value(2) }
     assert @tree.valid?
     
     # Range query should still work
@@ -1378,8 +1378,8 @@ class TestMultiRBTree < Minitest::Test
     assert_equal 100, result.size
     
     # Delete all
-    @tree.delete(1)
-    @tree.delete(2)
+    @tree.delete_key(1)
+    @tree.delete_key(2)
     assert_empty @tree
     assert @tree.valid?
   end
@@ -1405,7 +1405,7 @@ class TestMultiRBTree < Minitest::Test
   def test_multi_initialize_bulk_array_duplicates
     tree = MultiRBTree.new([[1, "one"], [1, "uno"]])
     assert_equal 2, tree.size
-    assert_equal ["one", "uno"], tree.get_all(1).to_a
+    assert_equal ["one", "uno"], tree.values(1).to_a
   end
 
   def test_multi_insert_hash
@@ -1417,6 +1417,6 @@ class TestMultiRBTree < Minitest::Test
     @tree.insert({1 => "one"}, overwrite: false)
     @tree.insert({1 => "uno"}, overwrite: false)
     assert_equal 2, @tree.size
-    assert_equal ["one", "uno"], @tree.get_all(1).to_a
+    assert_equal ["one", "uno"], @tree.values(1).to_a
   end
 end

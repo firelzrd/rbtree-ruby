@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-15
+
+### Changed
+### API Changes (Method Renaming & Deprecation)
+> [!WARNING]
+> The public API has been refactored to improve consistency. The following methods have been renamed.
+> Old methods are preserved as aliases for backward compatibility but are **deprecated** and may be removed in future versions.
+
+*   `get_all` -> `values` (Returns Enumerator by default)
+*   `delete_one` -> `delete_value`
+*   `delete` (MultiRBTree) -> `delete_key`
+    *   *Note: `delete` is now an alias for `delete_key` in MultiRBTree for compatibility.*
+*   `get` (MultiRBTree) -> *Behavior clarified*: Returns first value (alias for `first_value` or `value(key)`)
+*   `get_first`/`get_last` -> `first_value`/`last_value`
+*   `delete_first`/`delete_last` -> `delete_first_value`/`delete_last_value`
+
+- **Visibility**: `insert_entry` (RBTree) and traversal helper methods (MultiRBTree) are now `private` instead of `protected`, as they are internal implementation details.
+
+### Fixed
+- **MultiRBTree Traversal Fix**: Fixed an issue where `MultiRBTree#each` and other traversal methods yielded `key, value` as separate arguments instead of a single `[key, value]` array. This ensures compatibility with `Enumerable` methods like `count` and consistent behavior with `RBTree` and standard `Hash`.
+
 ## [0.2.3] - 2026-01-14
 
 ### Added
@@ -163,6 +184,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.3.0]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.0
+[0.2.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.3
+[0.2.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.2
+[0.2.1]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.1
 [0.2.0]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.0
 [0.1.8]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.8
 [0.1.7]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.1.7

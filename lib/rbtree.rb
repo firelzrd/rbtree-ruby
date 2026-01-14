@@ -56,7 +56,7 @@ class RBTree
 
   # Returns the number of key-value pairs stored in the tree.
   # @return [Integer] the number of entries in the tree
-  attr_reader :size
+  attr_reader :key_count
 
   # Creates a new RBTree from the given arguments.
   #
@@ -100,7 +100,7 @@ class RBTree
     @min_node = @nil_node
     @hash_index = {}  # Hash index for O(1) key lookup
     @node_pool = []   # Memory pool for recycling nodes
-    @size = 0
+    @key_count = 0
 
     if args.size > 0 || block_given?
       insert(*args, overwrite: overwrite, &block)
@@ -110,7 +110,20 @@ class RBTree
   # Checks if the tree is empty.
   #
   # @return [Boolean] true if the tree contains no elements, false otherwise
-  def empty? = @root == @nil_node
+  def empty? = @hash_index.empty?
+
+  # Returns the number of key-value pairs stored in the tree.
+  # @return [Integer] the number of entries in the tree
+  def size = @key_count
+  alias :value_count :size
+
+  # Returns the minimum key without removing it.
+  #
+  # @return [Object, nil] the minimum key, or nil if tree is empty
+  # @example
+  #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.min_key  # => 1
+  def min_key = min_node&.key
 
   # Returns the minimum key-value pair without removing it.
   #
@@ -118,7 +131,15 @@ class RBTree
   # @example
   #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
   #   tree.min  # => [1, "one"]
-  def min = find_min
+  def min = min_node&.pair
+
+  # Returns the maximum key without removing it.
+  #
+  # @return [Object, nil] the maximum key, or nil if tree is empty
+  # @example
+  #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.max_key  # => 3
+  def max_key = max_node&.key
 
   # Returns the maximum key-value pair without removing it.
   #
@@ -126,7 +147,23 @@ class RBTree
   # @example
   #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
   #   tree.max  # => [3, "three"]
-  def max = find_max
+  def max = max_node&.pair
+
+  # Returns the first key-value pair without removing it.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.first  # => [1, "one"]
+  def first = min
+
+  # Returns the last key-value pair without removing it.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.last  # => [3, "three"]
+  def last = max
 
   # Checks if the tree contains the given key.
   #
@@ -134,11 +171,10 @@ class RBTree
   # @return [Boolean] true if the key exists in the tree, false otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two'})
-  #   tree.has_key?(1)  # => true
-  #   tree.has_key?(3)  # => false
-  def has_key?(key)
-    @hash_index.key?(key)
-  end
+  #   tree.key?(1)  # => true
+  #   tree.key?(3)  # => false
+  def has_key?(key) = @hash_index.key?(key)
+  alias :key? :has_key?
 
   # Retrieves the value associated with the given key.
   #
@@ -149,10 +185,22 @@ class RBTree
   #   tree.get(1)  # => "one"
   #   tree[2]      # => "two"
   #   tree[3]      # => nil
-  def get(key)
-    @hash_index[key]&.value
-  end
-  alias_method :[], :get
+  def value(key) = @hash_index[key]&.value
+  alias :get :value
+  alias :[] :value
+
+  # Returns the key with the key closest to the given key.
+  #
+  # This method requires keys to be numeric or support subtraction and abs methods.
+  #
+  # @param key [Numeric] the target key
+  # @return [Object, nil] the key, or nil if tree is empty
+  # @example
+  #   tree = RBTree.new({1 => 'one', 5 => 'five', 10 => 'ten'})
+  #   tree.nearest_key(4)   # => 5
+  #   tree.nearest_key(7)   # => 5
+  #   tree.nearest_key(8)   # => 10
+  def nearest_key(key) = ((n = find_nearest_node(key)) == @nil_node)? nil : n.key
 
   # Returns the key-value pair with the key closest to the given key.
   #
@@ -166,11 +214,21 @@ class RBTree
   #   tree.nearest(4)   # => [5, "five"]
   #   tree.nearest(7)   # => [5, "five"]
   #   tree.nearest(8)   # => [10, "ten"]
-  def nearest(key)
-    return nil unless key.respond_to?(:-)
-    n = find_nearest_node(key)
-    n == @nil_node ? nil : n.pair
-  end
+  def nearest(key) = ((n = find_nearest_node(key)) == @nil_node)? nil : n.pair
+
+  # Returns the key with the largest key that is smaller than the given key.
+  #
+  # If the key exists in the tree, returns the predecessor (previous element).
+  # If the key does not exist, returns the largest key with key < given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Object, nil] the key, or nil if no predecessor exists
+  # @example
+  #   tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
+  #   tree.prev_key(5)   # => 3
+  #   tree.prev_key(4)   # => 3 (4 does not exist)
+  #   tree.prev_key(1)   # => nil (no predecessor)
+  def prev_key(key) = ((n = find_predecessor_node(key)) == @nil_node)? nil : n.key
 
   # Returns the key-value pair with the largest key that is smaller than the given key.
   #
@@ -184,10 +242,21 @@ class RBTree
   #   tree.prev(5)   # => [3, "three"]
   #   tree.prev(4)   # => [3, "three"] (4 does not exist)
   #   tree.prev(1)   # => nil (no predecessor)
-  def prev(key)
-    n = find_predecessor_node(key)
-    n == @nil_node ? nil : n.pair
-  end
+  def prev(key) = ((n = find_predecessor_node(key)) == @nil_node)? nil : n.pair
+
+  # Returns the key with the smallest key that is larger than the given key.
+  #
+  # If the key exists in the tree, returns the successor (next element).
+  # If the key does not exist, returns the smallest key with key > given key.
+  #
+  # @param key [Object] the reference key
+  # @return [Object, nil] the key, or nil if no successor exists
+  # @example
+  #   tree = RBTree.new({1 => 'one', 3 => 'three', 5 => 'five', 7 => 'seven'})
+  #   tree.succ_key(5)   # => 7
+  #   tree.succ_key(4)   # => 5 (4 does not exist)
+  #   tree.succ_key(1)   # => 3 (1 does not exist)
+  def succ_key(key) = ((n = find_successor_node(key)) == @nil_node)? nil : n.key
 
   # Returns the key-value pair with the smallest key that is larger than the given key.
   #
@@ -201,10 +270,7 @@ class RBTree
   #   tree.succ(5)   # => [7, "seven"]
   #   tree.succ(4)   # => [5, "five"] (4 does not exist)
   #   tree.succ(7)   # => nil (no successor)
-  def succ(key)
-    n = find_successor_node(key)
-    n == @nil_node ? nil : n.pair
-  end
+  def succ(key) = ((n = find_successor_node(key)) == @nil_node)? nil : n.pair
 
   # Inserts one or more key-value pairs into the tree.
   #
@@ -268,7 +334,7 @@ class RBTree
       end
     end
   end
-  alias_method :[]=, :insert
+  alias :[]= :insert
 
   # Deletes the key-value pair with the specified key.
   #
@@ -278,12 +344,12 @@ class RBTree
   #   tree = RBTree.new({1 => 'one', 2 => 'two'})
   #   tree.delete(1)  # => "one"
   #   tree.delete(3)  # => nil
-  def delete(key)
-    value = delete_node(key)
-    return nil unless value
-    @size -= 1
+  def delete_key(key)
+    return nil unless (value = (z = @hash_index[key])&.value)
+    delete_indexed_node(key)
     value
   end
+  alias :delete :delete_key
 
   # Removes and returns the minimum key-value pair.
   #
@@ -293,10 +359,10 @@ class RBTree
   #   tree.shift  # => [1, "one"]
   #   tree.shift  # => [2, "two"]
   def shift
-    return nil if @min_node == @nil_node
-    result = [@min_node.key, @min_node.value]
-    delete(@min_node.key)
-    result
+    return nil unless (n = @min_node) != @nil_node
+    pair = n.pair
+    delete(n.key)
+    pair
   end
 
   # Removes and returns the maximum key-value pair.
@@ -307,21 +373,46 @@ class RBTree
   #   tree.pop  # => [3, "three"]
   #   tree.pop  # => [2, "two"]
   def pop
-    n = rightmost(@root)
-    return nil if n == @nil_node
-    result = n.pair
+    return nil unless (n = rightmost(@root)) != @nil_node
+    pair = n.pair
     delete(n.key)
-    result
+    pair
   end
 
   # Removes all key-value pairs from the tree.
   #
   # @return [RBTree] self
   def clear
-    @root = @nil_node
-    @min_node = @nil_node
+    @root = @min_node = @nil_node
     @hash_index.clear
-    @size = 0
+    @key_count = 0
+    self
+  end
+
+  # Iterates over all keys in ascending (or descending) order.
+  #
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
+  # @yield [key] each key in the tree
+  # @return [Enumerator, RBTree] an Enumerator if no block is given, self otherwise
+  # @example
+  #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.keys { |k| puts k }
+  #   # Output:
+  #   # 1
+  #   # 2
+  #   # 3
+  #
+  #   # Reverse iteration
+  #   tree.keys(reverse: true) { |k| ... }
+  #
+  #   # Safe iteration for modifications
+  #   tree.keys(safe: true) do |k|
+  #     tree.delete(k) if k.even?
+  #   end
+  def keys(reverse: false, safe: false, &block)
+    return enum_for(:keys, reverse: reverse, safe: safe) { @key_count } unless block_given?
+    each(reverse: reverse, safe: safe) { |key, _| yield key }
     self
   end
 
@@ -347,7 +438,7 @@ class RBTree
   #     tree.delete(k) if k.even?
   #   end
   def each(reverse: false, safe: false, &block)
-    return enum_for(:each, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(:each, reverse: reverse, safe: safe) { size } unless block_given?
     if reverse
       traverse_all_desc(@root, safe: safe, &block)
     else
@@ -375,7 +466,10 @@ class RBTree
   # @yield [key, value] each key-value pair in the tree
   # @return [Enumerator, RBTree] an Enumerator if no block is given, self otherwise
   # @see #each
-  def reverse_each(safe: false, &block) = each(reverse: true, safe: safe, &block)
+  def reverse_each(safe: false, &block)
+    return enum_for(:reverse_each, safe: safe) { size } unless block_given?
+    each(reverse: true, safe: safe, &block)
+  end
 
   # Retrieves all key-value pairs with keys less than the specified key.
   #
@@ -492,13 +586,9 @@ class RBTree
   #
   # @return [String] a human-readable representation of the tree
   def inspect
-    if @size > 0
-      content = first(5).map { |k, v| "#{k.inspect}=>#{v.inspect}" }.join(", ")
-      suffix = @size > 5 ? ", ..." : ""
-      "#<#{self.class}:0x#{object_id.to_s(16)} size=#{@size} {#{content}#{suffix}}>"
-    else
-      super
-    end
+    content = take(5).map { |k, v| "#{k.inspect}=>#{v.inspect}" }.join(", ")
+    suffix = size > 5 ? ", ..." : ""
+    "#<#{self.class}:0x#{object_id.to_s(16)} size=#{size} {#{content}#{suffix}}>"
   end
 
   # Validates the red-black tree properties.
@@ -517,8 +607,12 @@ class RBTree
     true
   end
 
-  # @!visibility protected
-  protected
+  # @!visibility private
+  private
+
+  def min_node = ((n = @min_node) == @nil_node) ? nil : n
+
+  def max_node = ((n = rightmost(@root)) == @nil_node) ? nil : n
 
   # Inserts a single key-value pair.
   #
@@ -560,7 +654,6 @@ class RBTree
     z.right = @nil_node
     z.color = Node::RED
     insert_fixup(z)
-    @size += 1
     
     if @min_node == @nil_node || (key <=> @min_node.key) < 0
       @min_node = z
@@ -846,11 +939,7 @@ class RBTree
   #
   # @param key [Object] the key to delete
   # @return [Object, nil] the value of the deleted node, or nil if not found
-  def delete_node(key)
-    z = @hash_index.delete(key)  # O(1) lookup and remove from index
-    return nil unless z
-    remove_node(z)
-  end
+  def delete_indexed_node(key) = (z = @hash_index.delete(key)) && delete_node(z)
 
   # Removes a node from the tree and restores red-black properties.
   #
@@ -861,7 +950,7 @@ class RBTree
   #
   # @param z [Node] the node to remove
   # @return [Object] the value of the removed node
-  def remove_node(z)
+  def delete_node(z)
     next_min_node = nil
     if z == @min_node
       if z.right != @nil_node
@@ -984,25 +1073,6 @@ class RBTree
       u.parent.right = v
     end
     v.parent = u.parent
-  end
-
-  # Searches for a node with the given key.
-  #
-  # @param key [Object] the key to search for
-  # @return [Node] the found node, or @nil_node if not found
-  def find_node(key)
-    current = @root
-    while current != @nil_node
-      cmp = key <=> current.key
-      if cmp == 0
-        return current
-      elsif cmp < 0
-        current = current.left
-      else
-        current = current.right
-      end
-    end
-    @nil_node
   end
 
   # Finds the node with the closest key to the given key.
@@ -1159,7 +1229,7 @@ class RBTree
   # Returns the minimum key-value pair.
   #
   # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
-  def find_min = @min_node == @nil_node ? nil : @min_node.pair
+  def find_min = ((n = @min_node) != @nil_node) && n.pair
 
   # Finds the rightmost (maximum) node in a subtree.
   #
@@ -1175,7 +1245,7 @@ class RBTree
   # Returns the maximum key-value pair.
   #
   # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
-  def find_max = (n = rightmost(@root)) == @nil_node ? nil : n.pair
+  def find_max = ((n = rightmost(@root)) != @nil_node) && n.pair
 
   # Performs a left rotation on the given node.
   #
@@ -1238,7 +1308,8 @@ class RBTree
   # Allocates a new node or recycles one from the pool.
   # @return [Node]
   def allocate_node(key, value, color, left, right, parent)
-    if (node = @node_pool.pop)
+    node = @node_pool.pop
+    if node
       node.key = key
       node.value = value
       node.color = color
@@ -1247,8 +1318,10 @@ class RBTree
       node.parent = parent
       node
     else
-      Node.new(key, value, color, left, right, parent)
+      node = Node.new(key, value, color, left, right, parent)
     end
+    @key_count += 1
+    node
   end
 
   # Releases a node back to the pool.
@@ -1259,6 +1332,7 @@ class RBTree
     node.parent = nil
     node.value = nil # Help GC
     @node_pool << node
+    @key_count -= 1
   end
 
   # Recursively checks black height consistency.
@@ -1305,7 +1379,7 @@ end
 # == Features
 #
 # * Multiple values per key using arrays
-# * Separate methods for single deletion (`delete_one`) vs. all deletions (`delete`)
+# * Separate methods for single deletion (`delete_value`) vs. all deletions (`delete_key`)
 # * Values for each key maintain insertion order
 # * Configurable access to first or last value via `:last` option
 #
@@ -1314,10 +1388,10 @@ end
 # For each key, values are stored in insertion order. Methods that access
 # a single value support a `:last` option to choose which end of the array:
 #
-# * +get(key)+, +get_first(key)+ - returns first value (oldest)
-# * +get(key, last: true)+, +get_last(key)+ - returns last value (newest)
-# * +delete_one(key)+, +delete_first(key)+ - removes first value
-# * +delete_one(key, last: true)+, +delete_last(key)+ - removes last value
+# * +get(key)+, +first_value(key)+ - returns first value (oldest)
+# * +get(key, last: true)+, +last_value(key)+ - returns last value (newest)
+# * +delete_value(key)+, +delete_first_value(key)+ - removes first value
+# * +delete_value(key, last: true)+, +delete_last_value(key)+ - removes last value
 # * +prev(key)+, +succ(key)+ - returns first value of adjacent key
 # * +prev(key, last: true)+, +succ(key, last: true)+ - returns last value
 #
@@ -1351,9 +1425,9 @@ end
 #   tree.size             # => 3 (total key-value pairs)
 #   tree.get(1)           # => "first one" (first value)
 #   tree.get(1, last: true)  # => "second one" (last value)
-#   tree.get_all(1)       # => ["first one", "second one"] (all values)
+#   tree.values(1)        # => ["first one", "second one"] (all values)
 #
-#   tree.delete_one(1)    # removes only "first one"
+#   tree.delete_value(1)   # removes only "first one"
 #   tree.get(1)           # => "second one"
 #
 #   tree.delete(1)        # removes all remaining values for key 1
@@ -1361,16 +1435,46 @@ end
 # @author Masahito Suzuki
 # @since 0.1.2
 class MultiRBTree < RBTree
-  def min(last: false)
-    return nil if @min_node == @nil_node || @min_node.value.empty?
-    [@min_node.key, last ? @min_node.value.last : @min_node.value.first]
+  def initialize(*args, **kwargs)
+    @value_count = 0
+    super
   end
 
-  def max(last: false)
-    n = rightmost(@root)
-    return nil if n == @nil_node || n.value.empty?
-    [n.key, last ? n.value.last : n.value.first]
-  end
+  # Returns the number of values stored in the tree.
+  # @return [Integer] the number of values in the tree
+  def size = @value_count
+  
+  # Returns the minimum key-value pair without removing it.
+  #
+  # @param last [Boolean] whether to return the last value (default: false)
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.min  # => [1, "one"]
+  def min(last: false) = (n = min_node) && [n.key, n.value.send(last ? :last : :first)]
+
+  # Returns the maximum key-value pair without removing it.
+  #
+  # @param last [Boolean] whether to return the last value (default: false)
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.max  # => [3, "three"]
+  def max(last: false) = (n = max_node) && [n.key, n.value.send(last ? :last : :first)]
+
+  # Returns the last key-value pair without removing it.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.last  # => [3, "three"]
+  def last = max(last: true)
+
+  # Returns the number of values for a given key or the total number of key-value pairs if no key is given.
+  #
+  # @param key [Object, nil] the key to look up, or nil for total count
+  # @return [Integer] the number of values for the key, or total count if no key is given
+  def value_count(key = nil) = !key ? size : (@hash_index[key]&.value&.size || 0)
 
   # Retrieves a value associated with the given key.
   #
@@ -1383,41 +1487,66 @@ class MultiRBTree < RBTree
   #   tree.insert(1, 'second')
   #   tree.get(1)              # => "first"
   #   tree.get(1, last: true)  # => "second"
-  def get(key, last: false)
-    n = find_node(key)
-    return nil if n == @nil_node || n.value.empty?
-    last ? n.value.last : n.value.first
-  end
+  def value(key, last: false) = @hash_index[key]&.value&.send(last ? :last : :first)
 
   # Retrieves the first value associated with the given key.
   #
   # @param key [Object] the key to look up
   # @return [Object, nil] the first value for the key, or nil if not found
-  def get_first(key) = get(key, last: false)
+  def first_value(key) = value(key)
+  alias :get_first :first_value
 
   # Retrieves the last value associated with the given key.
   #
   # @param key [Object] the key to look up
   # @return [Object, nil] the last value for the key, or nil if not found
-  def get_last(key) = get(key, last: true)
+  def last_value(key) = value(key, last: true)
+  alias :get_last :last_value
 
-  def nearest(key, last: false)
-    n = find_nearest_node(key)
-    return nil if n == @nil_node || n.value.empty?
-    [n.key, last ? n.value.last : n.value.first]
+  # Retrieves all values associated with the given key.
+  #
+  # @param key [Object] the key to look up
+  # @return [Array, nil] an Array containing all values, or nil if not found
+  # @example
+  #   tree = MultiRBTree.new
+  #   tree.insert(1, 'first')
+  #   tree.insert(1, 'second')
+  #   tree.values(1).to_a   # => ["first", "second"]
+  def values(key, reverse: false)
+    return enum_for(:values, key) { value_count(key) } unless block_given?
+    @hash_index[key]&.value&.send(reverse ? :reverse_each : :each) { |v| yield v }
   end
+  alias :get_all :values
 
-  def prev(key, last: false)
-    pair = super(key)
-    return nil unless pair
-    [pair[0], last ? pair[1].last : pair[1].first]
-  end
-  
-  def succ(key, last: false)
-    pair = super(key)
-    return nil unless pair
-    [pair[0], last ? pair[1].last : pair[1].first]
-  end
+  # Returns the nearest key-value pair without removing it.
+  #
+  # @param key [Object] the target key
+  # @param last [Boolean] whether to return the last value (default: false)
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.nearest(4)   # => [5, "five"]
+  def nearest(key, last: false) = (pair = super(key)) && [pair[0], pair[1].send(last ? :last : :first)]
+
+  # Returns the previous key-value pair without removing it.
+  #
+  # @param key [Object] the target key
+  # @param last [Boolean] whether to return the last value (default: false)
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.prev(4)   # => [5, "five"]
+  def prev(key, last: false) = (pair = super(key)) && [pair[0], pair[1].send(last ? :last : :first)]
+
+  # Returns the next key-value pair without removing it.
+  #
+  # @param key [Object] the target key
+  # @param last [Boolean] whether to return the last value (default: false)
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.succ(4)   # => [5, "five"]
+  def succ(key, last: false) = (pair = super(key)) && [pair[0], pair[1].send(last ? :last : :first)]
 
   # Inserts a value for the given key.
   #
@@ -1435,7 +1564,7 @@ class MultiRBTree < RBTree
   def insert_entry(key, value, **)
     if (node = @hash_index[key])
       node.value << value
-      @size += 1
+      @value_count += 1
       return true
     end
     y = @nil_node
@@ -1445,7 +1574,7 @@ class MultiRBTree < RBTree
       cmp = key <=> x.key
       if cmp == 0
         x.value << value
-        @size += 1
+        @value_count += 1
         return true
       elsif cmp < 0
         x = x.left
@@ -1466,7 +1595,7 @@ class MultiRBTree < RBTree
     z.right = @nil_node
     z.color = Node::RED
     insert_fixup(z)
-    @size += 1
+    @value_count += 1
     
     if @min_node == @nil_node || (key <=> @min_node.key) < 0
       @min_node = z
@@ -1488,32 +1617,30 @@ class MultiRBTree < RBTree
   #   tree = MultiRBTree.new
   #   tree.insert(1, 'first')
   #   tree.insert(1, 'second')
-  #   tree.delete_one(1)              # => "first"
-  #   tree.delete_one(1, last: true)  # => "second" (if more values existed)
-  def delete_one(key, last: false)
-    z = @hash_index[key]  # O(1) lookup
-    return nil unless z
-
-    value = last ? z.value.pop : z.value.shift
-    @size -= 1
-    if z.value.empty?
-      @hash_index.delete(key)  # Remove from index when node removed
-      remove_node(z)
-    end
+  #   tree.delete_value(1)            # => "first"
+  #   tree.delete_value(1, last: true)  # => "second" (if more values existed)
+  def delete_value(key, last: false)
+    (z = @hash_index[key]) or return nil
+    value = z.value.send(last ? :pop : :shift)
+    z.value.empty? && delete_indexed_node(key)
+    @value_count -= 1
     value
   end
+  alias :delete_one :delete_value
 
   # Deletes the first value for the specified key.
   #
   # @param key [Object] the key to delete from
   # @return [Object, nil] the deleted value, or nil if key not found
-  def delete_first(key) = delete_one(key, last: false)
+  def delete_first_value(key) = delete_value(key)
+  alias :delete_first :delete_first_value
 
   # Deletes the last value for the specified key.
   #
   # @param key [Object] the key to delete from
   # @return [Object, nil] the deleted value, or nil if key not found
-  def delete_last(key) = delete_one(key, last: true)
+  def delete_last_value(key) = delete_value(key, last: true)
+  alias :delete_last :delete_last_value
 
   # Deletes all values for the specified key.
   #
@@ -1527,65 +1654,62 @@ class MultiRBTree < RBTree
   #   tree.insert(1, 'second')
   #   vals = tree.delete(1)  # removes both values
   #   vals.size  # => 2
-  def delete(key)
-    z = @hash_index.delete(key)  # O(1) lookup and remove from index
-    return nil unless z
-    
-    count = z.value.size
-    remove_node(z)
-    @size -= count
-    z.value
+  def delete_key(key)
+    return nil unless (z = @hash_index[key])
+    @value_count -= (value = z.value).size
+    delete_indexed_node(z.key)
+    value
   end
 
-  def shift
-    return nil if @min_node == @nil_node
-    node = @min_node
-    key = node.key
-    val = node.value.first
-    node.value.shift
-    @size -= 1
-    if node.value.empty?
-      delete_node(key)
-    end
-    [key, val]
-  end
-
-  def pop
-    n = rightmost(@root)
-    return nil if n == @nil_node
-    key = n.key
-    val = n.value.last
-    n.value.pop
-    @size -= 1
-    if n.value.empty?
-      delete_node(key)
-    end
-    [key, val]
-  end
-
-  # Retrieves all values associated with the given key.
+  # Removes and returns the first key-value pair.
   #
-  # @param key [Object] the key to look up
-  # @return [Array, nil] an Array containing all values, or nil if not found
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
   # @example
-  #   tree = MultiRBTree.new
-  #   tree.insert(1, 'first')
-  #   tree.insert(1, 'second')
-  #   tree.get_all(1).to_a  # => ["first", "second"]
-  def get_all(key)
-    return enum_for(:get_all, key) unless block_given?
-    @hash_index[key]&.value&.each { |v| yield v }
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.shift  # => [1, "one"]
+  def shift
+    (key, vals = min_node&.pair) or return nil
+    val = vals.shift
+    vals.empty? && delete_indexed_node(key)
+    @value_count -= 1
+    [key, val]
   end
 
-  # @!visibility protected
-  protected
+  # Removes and returns the last key-value pair.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  # @example
+  #   tree = MultiRBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
+  #   tree.pop  # => [3, "three"]
+  def pop
+    (key, vals = max_node&.pair) or return nil
+    val = vals.pop
+    vals.empty? && delete_indexed_node(key)
+    @value_count -= 1
+    [key, val]
+  end
 
+  # @!visibility private
+  private
+
+  # Traverses the tree in ascending order, yielding each key-value pair.
+  #
+  # @param range [Range] the range of keys to traverse
+  # @yield [Array(Object, Object)] each key-value pair
+  # @yieldparam key [Object] the key
+  # @yieldparam val [Object] the value
   def traverse_range_asc(...)
-    super { |k, vals| vals.each { |v| yield k, v } }
+    super { |k, vals| vals.each { |v| yield [k, v] } }
   end
 
+  # Traverses the tree in descending order, yielding each key-value pair.
+  #
+  # @param range [Range] the range of keys to traverse
+  # @yield [Array(Object, Object)] each key-value pair
+  # @yieldparam key [Object] the key
+  # @yieldparam val [Object] the value
   def traverse_range_desc(...)
-    super { |k, vals| vals.reverse_each { |v| yield k, v } }
+    super { |k, vals| vals.reverse_each { |v| yield [k, v] } }
   end
 end
 
