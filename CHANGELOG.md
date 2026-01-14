@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-01-14
+
+### Changed
+- **Iterative Traversal (Complete)**: All traversal methods (`lt`, `lte`, `gt`, `gte`, `between` and their `_desc` variants) now use an iterative stack-based approach instead of recursion.
+  - Ensures deep trees can be traversed without `SystemStackError`.
+  - Applies to both `RBTree` and `MultiRBTree`.
+- **Code Deduplication**: Unified traversal logic between `RBTree` and `MultiRBTree` for better maintainability.
+- **Documentation**: Minor typo fixes.
+
+### Fixed
+- **MultiRBTree#prev / #succ**: Fixed incorrect use of bare `super` which forwarded keyword arguments to parent methods that don't accept them. Also fixed incorrect access to parent return value (was treating `[key, value]` pair as a node object).
+- **MultiRBTree#shift / #pop hash index leak**: When `shift` or `pop` removed the last value for a key, the key remained in the internal hash index (`@hash_index`). Now correctly uses `delete_node(key)` instead of `remove_node(node)` to ensure hash index consistency.
+
 ## [0.2.1] - 2026-01-14
 
 ### Added
