@@ -268,13 +268,15 @@ class RBTree
   def pop
     n = rightmost(@root)
     return nil if n == @nil_node
-    result = [n.key, n.value]
+    result = n.pair
     delete(n.key)
     result
   end
 
-  # Iterates over all key-value pairs in ascending order of keys.
+  # Iterates over all key-value pairs in ascending (or descending) order.
   #
+  # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each key-value pair in the tree
   # @return [Enumerator, RBTree] an Enumerator if no block is given, self otherwise
   # @example
@@ -284,9 +286,40 @@ class RBTree
   #   # 1: one
   #   # 2: two
   #   # 3: three
-  def each(&block)
-    return enum_for(:each) unless block_given?
-    traverse_asc(@root, &block)
+  #
+  #   # Reverse iteration
+  #   tree.each(reverse: true) { |k, v| ... }
+  #
+  #   # Safe iteration for modifications
+  #   tree.each(safe: true) do |k, v|
+  #     tree.delete(k) if k.even?
+  #   end
+  def each(reverse: false, safe: false, &block)
+    return enum_for(:each, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = find_max
+        while pair
+          current_key = pair[0]
+          yield pair[0], pair[1]
+          pair = find_predecessor(current_key)
+        end
+      else
+        pair = find_min
+        while pair
+          current_key = pair[0]
+          yield pair[0], pair[1]
+          pair = find_successor(current_key)
+        end
+      end
+    else
+      if reverse
+        traverse_desc(@root, &block)
+      else
+        traverse_asc(@root, &block)
+      end
+    end
+    self
   end
 
   # Iterates over all key-value pairs in descending order of keys.
@@ -300,10 +333,15 @@ class RBTree
   #   # 3: three
   #   # 2: two
   #   # 1: one
-  def reverse_each(&block)
-    return enum_for(:reverse_each) unless block_given?
-    traverse_desc(@root, &block)
-  end
+  # Iterates over all key-value pairs in descending order of keys.
+  #
+  # This is an alias for `each(reverse: true)`.
+  #
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
+  # @yield [key, value] each key-value pair in the tree
+  # @return [Enumerator, RBTree] an Enumerator if no block is given, self otherwise
+  # @see #each
+  def reverse_each(safe: false, &block) = each(reverse: true, safe: safe, &block)
 
   # Returns the minimum key-value pair without removing it.
   #
@@ -311,9 +349,7 @@ class RBTree
   # @example
   #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
   #   tree.min  # => [1, "one"]
-  def min
-    @min_node == @nil_node ? nil : [@min_node.key, @min_node.value]
-  end
+  def min = find_min
 
   # Returns the maximum key-value pair without removing it.
   #
@@ -321,25 +357,39 @@ class RBTree
   # @example
   #   tree = RBTree.new({3 => 'three', 1 => 'one', 2 => 'two'})
   #   tree.max  # => [3, "three"]
-  def max
-    n = rightmost(@root)
-    n == @nil_node ? nil : [n.key, n.value]
-  end
+  def max = find_max
 
   # Retrieves all key-value pairs with keys less than the specified key.
   #
   # @param key [Object] the upper bound (exclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.lt(3).to_a  # => [[1, "one"], [2, "two"]]
   #   tree.lt(3, reverse: true).first  # => [2, "two"]
-  #   tree.lt(3) { |k, v| puts k }  # prints keys, returns self
-  def lt(key, reverse: false, &block)
-    return enum_for(:lt, key, reverse: reverse) unless block_given?
-    if reverse
+  #   tree.lt(3, safe: true) { |k, _| tree.delete(k) if k.even? }  # safe to delete
+  def lt(key, reverse: false, safe: false, &block)
+    return enum_for(:lt, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = find_predecessor(key)
+        while pair
+          current_key = pair[0]
+          yield pair
+          pair = find_predecessor(current_key)
+        end
+      else
+        pair = find_min
+        while pair && pair[0] < key
+          current_key = pair[0]
+          yield pair
+          pair = find_successor(current_key)
+        end
+      end
+    elsif reverse
       traverse_lt_desc(@root, key, &block)
     else
       traverse_lt(@root, key, &block)
@@ -351,15 +401,32 @@ class RBTree
   #
   # @param key [Object] the upper bound (inclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.lte(3).to_a  # => [[1, "one"], [2, "two"], [3, "three"]]
   #   tree.lte(3, reverse: true).first  # => [3, "three"]
-  def lte(key, reverse: false, &block)
-    return enum_for(:lte, key, reverse: reverse) unless block_given?
-    if reverse
+  def lte(key, reverse: false, safe: false, &block)
+    return enum_for(:lte, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = @hash_index[key]&.pair || find_predecessor(key)
+        while pair
+          current_key = pair[0]
+          yield pair
+          pair = find_predecessor(current_key)
+        end
+      else
+        pair = find_min
+        while pair && pair[0] <= key
+          current_key = pair[0]
+          yield pair
+          pair = succ(current_key)
+        end
+      end
+    elsif reverse
       traverse_lte_desc(@root, key, &block)
     else
       traverse_lte(@root, key, &block)
@@ -371,15 +438,32 @@ class RBTree
   #
   # @param key [Object] the lower bound (exclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.gt(2).to_a  # => [[3, "three"], [4, "four"]]
   #   tree.gt(2, reverse: true).first  # => [4, "four"]
-  def gt(key, reverse: false, &block)
-    return enum_for(:gt, key, reverse: reverse) unless block_given?
-    if reverse
+  def gt(key, reverse: false, safe: false, &block)
+    return enum_for(:gt, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = find_max
+        while pair && pair[0] > key
+          current_key = pair[0]
+          yield pair
+          pair = find_predecessor(current_key)
+        end
+      else
+        pair = find_successor(key)
+        while pair
+          current_key = pair[0]
+          yield pair
+          pair = find_successor(current_key)
+        end
+      end
+    elsif reverse
       traverse_gt_desc(@root, key, &block)
     else
       traverse_gt(@root, key, &block)
@@ -391,15 +475,32 @@ class RBTree
   #
   # @param key [Object] the lower bound (inclusive)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
   #   tree.gte(2).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
   #   tree.gte(2, reverse: true).first  # => [4, "four"]
-  def gte(key, reverse: false, &block)
-    return enum_for(:gte, key, reverse: reverse) unless block_given?
-    if reverse
+  def gte(key, reverse: false, safe: false, &block)
+    return enum_for(:gte, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = find_max
+        while pair && pair[0] >= key
+          current_key = pair[0]
+          yield pair
+          pair = find_predecessor(current_key)
+        end
+      else
+        pair = @hash_index[key]&.pair || find_successor(key)
+        while pair
+          current_key = pair[0]
+          yield pair
+          pair = find_successor(current_key)
+        end
+      end
+    elsif reverse
       traverse_gte_desc(@root, key, &block)
     else
       traverse_gte(@root, key, &block)
@@ -414,15 +515,34 @@ class RBTree
   # @param include_min [Boolean] whether to include the lower bound (default: true)
   # @param include_max [Boolean] whether to include the upper bound (default: true)
   # @param reverse [Boolean] if true, iterate in descending order (default: false)
+  # @param safe [Boolean] if true, safe for modifications during iteration (default: false)
   # @yield [key, value] each matching key-value pair (if block given)
   # @return [Enumerator, RBTree] Enumerator if no block given, self otherwise
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four', 5 => 'five'})
   #   tree.between(2, 4).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
   #   tree.between(2, 4, reverse: true).first  # => [4, "four"]
-  def between(min, max, include_min: true, include_max: true, reverse: false, &block)
-    return enum_for(:between, min, max, include_min: include_min, include_max: include_max, reverse: reverse) unless block_given?
-    if reverse
+  def between(min, max, include_min: true, include_max: true, reverse: false, safe: false, &block)
+    return enum_for(:between, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      if reverse
+        pair = include_max && @hash_index[max]&.pair || find_predecessor(max)
+        while pair && pair[0] > min
+          current_key = pair[0]
+          yield pair
+          pair = find_predecessor(current_key)
+        end
+        yield pair if pair && include_min && pair[0] == min
+      else
+        pair = include_min && @hash_index[min]&.pair || find_successor(min)
+        while pair && pair[0] < max
+          current_key = pair[0]
+          yield pair
+          pair = find_successor(current_key)
+        end
+        yield pair if pair && include_max && pair[0] == max
+      end
+    elsif reverse
       traverse_between_desc(@root, min, max, include_min, include_max, &block)
     else
       traverse_between(@root, min, max, include_min, include_max, &block)
@@ -445,7 +565,7 @@ class RBTree
   def nearest(key)
     return nil unless key.respond_to?(:-)
     n = find_nearest_node(key)
-    n == @nil_node ? nil : [n.key, n.value]
+    n == @nil_node ? nil : n.pair
   end
 
   # Returns the key-value pair with the largest key that is smaller than the given key.
@@ -462,7 +582,7 @@ class RBTree
   #   tree.prev(1)   # => nil (no predecessor)
   def prev(key)
     n = find_predecessor_node(key)
-    n == @nil_node ? nil : [n.key, n.value]
+    n == @nil_node ? nil : n.pair
   end
 
   # Returns the key-value pair with the smallest key that is larger than the given key.
@@ -479,7 +599,7 @@ class RBTree
   #   tree.succ(7)   # => nil (no successor)
   def succ(key)
     n = find_successor_node(key)
-    n == @nil_node ? nil : [n.key, n.value]
+    n == @nil_node ? nil : n.pair
   end
 
   # Validates the red-black tree properties.
@@ -515,7 +635,7 @@ class RBTree
         current = current.left
       end
       current = stack.pop
-      yield current.key, current.value
+      yield current.pair
       current = current.right
     end
   end
@@ -534,7 +654,7 @@ class RBTree
         current = current.right
       end
       current = stack.pop
-      yield current.key, current.value
+      yield current.pair
       current = current.left
     end
   end
@@ -550,7 +670,7 @@ class RBTree
     
     traverse_lt(node.left, key, &block)
     if (node.key <=> key) < 0
-      yield node.key, node.value
+      yield node.pair
       traverse_lt(node.right, key, &block)
     end
   end
@@ -566,7 +686,7 @@ class RBTree
     
     traverse_lte(node.left, key, &block)
     if (node.key <=> key) <= 0
-      yield node.key, node.value
+      yield node.pair
       traverse_lte(node.right, key, &block)
     end
   end
@@ -582,7 +702,7 @@ class RBTree
     
     if (node.key <=> key) > 0
       traverse_gt(node.left, key, &block)
-      yield node.key, node.value
+      yield node.pair
     end
     traverse_gt(node.right, key, &block)
   end
@@ -598,7 +718,7 @@ class RBTree
     
     if (node.key <=> key) >= 0
       traverse_gte(node.left, key, &block)
-      yield node.key, node.value
+      yield node.pair
     end
     traverse_gte(node.right, key, &block)
   end
@@ -622,7 +742,7 @@ class RBTree
     less = include_max ? (node.key <=> max) <= 0 : (node.key <=> max) < 0
     
     if greater && less
-      yield node.key, node.value
+      yield node.pair
     end
     
     if (node.key <=> max) < 0
@@ -641,7 +761,7 @@ class RBTree
     
     if (node.key <=> key) < 0
       traverse_lt_desc(node.right, key, &block)
-      yield node.key, node.value
+      yield node.pair
     end
     traverse_lt_desc(node.left, key, &block)
   end
@@ -657,7 +777,7 @@ class RBTree
     
     if (node.key <=> key) <= 0
       traverse_lte_desc(node.right, key, &block)
-      yield node.key, node.value
+      yield node.pair
     end
     traverse_lte_desc(node.left, key, &block)
   end
@@ -673,7 +793,7 @@ class RBTree
     
     traverse_gt_desc(node.right, key, &block)
     if (node.key <=> key) > 0
-      yield node.key, node.value
+      yield node.pair
       traverse_gt_desc(node.left, key, &block)
     end
   end
@@ -689,7 +809,7 @@ class RBTree
     
     traverse_gte_desc(node.right, key, &block)
     if (node.key <=> key) >= 0
-      yield node.key, node.value
+      yield node.pair
       traverse_gte_desc(node.left, key, &block)
     end
   end
@@ -714,7 +834,7 @@ class RBTree
     less = include_max ? (node.key <=> max) <= 0 : (node.key <=> max) < 0
     
     if greater && less
-      yield node.key, node.value
+      yield node.pair
     end
     
     if (node.key <=> min) > 0
@@ -1011,6 +1131,16 @@ class RBTree
     predecessor
   end
 
+  # Finds the node with the largest key that is smaller than the given key.
+  # Returns the key-value pair if found, or nil if the tree is empty.
+  #
+  # @param key [Object] the reference key
+  # @return [Array(Object, Object), nil] the key-value pair, or nil if tree is empty
+  def find_predecessor(key)
+    n = find_predecessor_node(key)
+    n == @nil_node ? nil : n.pair
+  end
+
   # Finds the node with the smallest key that is larger than the given key.
   #
   # If the key exists in the tree, returns its successor node.
@@ -1051,6 +1181,16 @@ class RBTree
     successor
   end
 
+  # Finds the node with the smallest key that is larger than the given key.
+  # Returns the key-value pair if found, or nil if the tree is empty.
+  #
+  # @param key [Object] the reference key
+  # @return [Array(Object, Object), nil] the key-value pair, or nil if tree is empty
+  def find_successor(key)
+    n = find_successor_node(key)
+    n == @nil_node ? nil : n.pair
+  end
+
   # Finds the leftmost (minimum) node in a subtree.
   #
   # @param node [Node] the root of the subtree
@@ -1062,6 +1202,11 @@ class RBTree
     node
   end
 
+  # Returns the minimum key-value pair.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  def find_min = @min_node == @nil_node ? nil : @min_node.pair
+
   # Finds the rightmost (maximum) node in a subtree.
   #
   # @param node [Node] the root of the subtree
@@ -1072,6 +1217,11 @@ class RBTree
     end
     node
   end
+
+  # Returns the maximum key-value pair.
+  #
+  # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
+  def find_max = (n = rightmost(@root)) == @nil_node ? nil : n.pair
 
   # Performs a left rotation on the given node.
   #
@@ -1304,8 +1454,8 @@ class MultiRBTree < RBTree
   #   tree.insert(1, 'second')
   #   tree.get_all(1).to_a  # => ["first", "second"]
   def get_all(key)
-    n = find_node(key)
-    n == @nil_node || n.value.empty? ? nil : n.value
+    return enum_for(:get_all, key) unless block_given?
+    @hash_index[key]&.value&.each { |v| yield v }
   end
 
   # Inserts a value for the given key.
@@ -1467,17 +1617,74 @@ class MultiRBTree < RBTree
     [n.key, last ? n.value.last : n.value.first]
   end
 
-  def prev(key, last: false)
-    n = find_predecessor_node(key)
-    return nil if n == @nil_node || n.value.empty?
-    [n.key, last ? n.value.last : n.value.first]
+  def each(reverse: false, safe: false, &block)
+    return enum_for(:each, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
   end
 
-  def succ(key, last: false)
-    n = find_successor_node(key)
-    return nil if n == @nil_node || n.value.empty?
-    [n.key, last ? n.value.last : n.value.first]
+  def lt(key, reverse: false, safe: false, &block)
+    return enum_for(:lt, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
   end
+
+  def lte(key, reverse: false, safe: false, &block)
+    return enum_for(:lte, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
+  end
+
+  def gt(key, reverse: false, safe: false, &block)
+    return enum_for(:gt, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
+  end
+
+  def gte(key, reverse: false, safe: false, &block)
+    return enum_for(:gte, key, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
+  end
+
+  def between(min, max, include_min: true, include_max: true, reverse: false, safe: false, &block)
+    return enum_for(:between, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
+    if safe
+      super do |k, vals|
+        vals.send(reverse ? :reverse_each : :each) { |v| yield k, v }
+      end
+    else
+      super
+    end
+  end
+
+  def prev(key, last: false) = (n = super) && [n.key, last ? n.value.last : n.value.first]
+  def succ(key, last: false) = (n = super) && [n.key, last ? n.value.last : n.value.first]
 
   private
 
@@ -1678,4 +1885,8 @@ class RBTree::Node
   # Checks if the node is black.
   # @return [Boolean] true if black, false otherwise
   def black? = @color == BLACK
+
+  # Returns the key-value pair.
+  # @return [Array(Object, Object)] the key-value pair
+  def pair = [key, value]
 end

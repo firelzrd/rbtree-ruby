@@ -2,5 +2,5 @@
 
 class RBTree
   # The version of the rbtree-ruby gem
-  VERSION = "0.2.0"
+  VERSION = "0.2.1"
 end

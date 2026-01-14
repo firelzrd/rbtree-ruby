@@ -2,7 +2,8 @@
 
 🌍 *[English](README.md) | [日本語](README.ja.md)*
 
-A pure Ruby implementation of the Red-Black Tree data structure, providing efficient ordered key-value storage with O(log n) time complexity for insertion, deletion, and lookup operations.
+A pure Ruby implementation of the Red-Black Tree data structure, providing efficient ordered
+key-value storage with O(log n) time complexity for insertion, deletion, and lookup operations.
 
 ## Features
 
@@ -60,6 +61,12 @@ tree.each { |key, value| puts "#{key}: #{value}" }
 # 10: ten
 # 20: twenty
 
+# Modification during iteration
+# Unlike standard Ruby Hash/Array, modification during iteration is fully supported
+# with the `safe: true` option. This allows you to delete or insert keys safely while iterating.
+tree.each(safe: true) { |k, v| tree.delete(k) if k.even? }
+tree.each(reverse: true) { |k, v| puts k }  # Same as reverse_each
+
 # Min and max
 tree.min  # => [1, "one"]
 tree.max  # => [20, "twenty"]
@@ -100,8 +107,8 @@ tree.size  # => 4 (total number of key-value pairs)
 tree.get(1)      # => "first one"
 tree[1]          # => "first one"
 
-# Get all values for a key
-tree.get_all(1)  # => ["first one", "second one", "third one"]
+# Get all values for a key (returns Enumerator)
+tree.get_all(1).to_a  # => ["first one", "second one", "third one"]
 
 # Iterate over all key-value pairs
 tree.each { |k, v| puts "#{k}: #{v}" }

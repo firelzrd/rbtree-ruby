@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-01-14
+
+### Added
+- **Enhanced iteration**: `each` now accepts `reverse:` and `safe:` options
+  - `tree.each(reverse: true) { ... }` (same as `reverse_each`)
+  - `tree.each(safe: true) { ... }` (modification-safe)
+  - `tree.each(reverse: true, safe: true) { ... }` (reverse modification-safe)
+  - In `MultiRBTree`, `reverse: true` also iterates over values in reverse insertion order.
+- **Range query safe mode**: `safe:` option for `lt`, `lte`, `gt`, `gte`, `between`
+  - `tree.lt(10, safe: true) { |k, _| tree.delete(k) if k.even? }`
+  - Works with `:reverse` option: `tree.gt(5, reverse: true, safe: true)`
+  - Returns Enumerator: `tree.between(1, 100, safe: true).select { ... }`
+
+### Changed
+- **MultiRBTree#get_all**: Now returns an `Enumerator` instead of an `Array` when no block is given.
+  - Improves consistency with other iteration methods.
+  - Safe handling for non-existent keys (returns empty Enumerator/nil logic handled safely).
+  - Use `.to_a` to get an Array: `tree.get_all(key).to_a`
+
 ## [0.2.0] - 2026-01-14
 
 ### Added
