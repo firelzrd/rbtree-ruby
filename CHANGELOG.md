@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-01-23
+
+### Optimized
+- **find_successor_node**: Optimized performance for scans starting from the beginning (or before `min_key`) when the `safe: true` option is used. Added a fast-path (short-circuit) when the given key is smaller than `min_key`.
+
+### Fixed
+- **MultiRBTree Aliases**: Fixed `delete`, `get`, and `[]` aliases in `MultiRBTree`. They now correctly point to the overridden methods in the derived class, ensuring correct value handling and size tracking.
+- **enum_for Syntax**: Syntactic corrections for `enum_for` to ensure robust keyword argument handling in enumerators.
+
 ## [0.3.2] - 2026-01-15
 
 ### Added

@@ -6,11 +6,14 @@ A pure Ruby implementation of the Red-Black Tree data structure, providing effic
 
 ## Features
 
-- **Self-Balancing Binary Search Tree**: Maintains optimal performance through red-black tree properties
-- **Ordered Operations**: Efficient range queries, min/max retrieval, and sorted iteration
-- **Multi-Value Support**: `MultiRBTree` class for storing multiple values per key
-- **Pure Ruby**: No C extensions required, works on any Ruby implementation
-- **Well-Documented**: Comprehensive RDoc documentation with examples
+- **Self-Balancing Binary Search Tree**: Maintains optimal performance through red-black tree properties. All insertions, deletions, and lookups run in O(log n).
+- **Ordered Operations**: Efficient sorted iteration, range queries (`lt`, `gt`, `between`), min/max retrieval.
+- **Multi-Value Support**: `MultiRBTree` class stores multiple values per key, with access to first or last value individually.
+- **Pure Ruby**: No C extensions required. Works on MRI, JRuby, TruffleRuby, and all Ruby implementations.
+- **Hybrid Indexing**: Internal hash index enables O(1) key lookup and membership checks — matching standard Hash performance.
+- **Memory Efficiency**: Node recycling with auto-shrinking pool (`AutoShrinkNodePool`) drastically reduces GC pressure in long-running apps.
+- **Nearest Key Search**: Finds the closest numeric key in O(log n) time — ideal for spatial or temporal queries.
+- **Safe Iteration**: Use `safe: true` to safely modify the tree (insert/delete) during iteration.
 
 ## Installation
 

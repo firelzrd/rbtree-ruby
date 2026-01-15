@@ -432,7 +432,7 @@ class RBTree
   #     tree.delete(k) if k.even?
   #   end
   def keys(reverse: false, safe: false, &block)
-    return enum_for(:keys, reverse: reverse, safe: safe) { @key_count } unless block_given?
+    return enum_for(__method__, reverse: reverse, safe: safe) { @key_count } unless block_given?
     each(reverse: reverse, safe: safe) { |key, _| yield key }
     self
   end
@@ -459,7 +459,7 @@ class RBTree
   #     tree.delete(k) if k.even?
   #   end
   def each(reverse: false, safe: false, &block)
-    return enum_for(:each, reverse: reverse, safe: safe) { size } unless block_given?
+    return enum_for(__method__, reverse: reverse, safe: safe) { size } unless block_given?
     if reverse
       traverse_all_desc(@root, safe: safe, &block)
     else
@@ -488,7 +488,7 @@ class RBTree
   # @return [Enumerator, RBTree] an Enumerator if no block is given, self otherwise
   # @see #each
   def reverse_each(safe: false, &block)
-    return enum_for(:reverse_each, safe: safe) { size } unless block_given?
+    return enum_for(__method__, safe: safe) { size } unless block_given?
     each(reverse: true, safe: safe, &block)
   end
 
@@ -505,7 +505,7 @@ class RBTree
   #   tree.lt(3, reverse: true).first  # => [2, "two"]
   #   tree.lt(3, safe: true) { |k, _| tree.delete(k) if k.even? }  # safe to delete
   def lt(key, reverse: false, safe: false, &block)
-    return enum_for(:lt, key, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
     if reverse
       traverse_lt_desc(@root, key, safe: safe, &block)
     else
@@ -526,7 +526,7 @@ class RBTree
   #   tree.lte(3).to_a  # => [[1, "one"], [2, "two"], [3, "three"]]
   #   tree.lte(3, reverse: true).first  # => [3, "three"]
   def lte(key, reverse: false, safe: false, &block)
-    return enum_for(:lte, key, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
     if reverse
       traverse_lte_desc(@root, key, safe: safe, &block)
     else
@@ -547,7 +547,7 @@ class RBTree
   #   tree.gt(2).to_a  # => [[3, "three"], [4, "four"]]
   #   tree.gt(2, reverse: true).first  # => [4, "four"]
   def gt(key, reverse: false, safe: false, &block)
-    return enum_for(:gt, key, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
     if reverse
       traverse_gt_desc(@root, key, safe: safe, &block)
     else
@@ -568,7 +568,7 @@ class RBTree
   #   tree.gte(2).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
   #   tree.gte(2, reverse: true).first  # => [4, "four"]
   def gte(key, reverse: false, safe: false, &block)
-    return enum_for(:gte, key, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
     if reverse
       traverse_gte_desc(@root, key, safe: safe, &block)
     else
@@ -592,7 +592,7 @@ class RBTree
   #   tree.between(2, 4).to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
   #   tree.between(2, 4, reverse: true).first  # => [4, "four"]
   def between(min, max, include_min: true, include_max: true, reverse: false, safe: false, &block)
-    return enum_for(:between, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
+    return enum_for(__method__, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
     if reverse
       traverse_between_desc(@root, min, max, include_min, include_max, safe: safe, &block)
     else
@@ -1194,6 +1194,8 @@ class RBTree
   # @param key [Object] the reference key
   # @return [Node] the successor node, or @nil_node if none exists
   def find_successor_node(key)
+    # If key is smaller than min_key, return min_node
+    return @min_node if min_key && key < min_key
     # Check if key exists using O(1) hash lookup
     if (node = @hash_index[key])
       # Key exists: find successor in subtree or ancestors
@@ -1496,6 +1498,8 @@ class MultiRBTree < RBTree
   #   tree.get(1)              # => "first"
   #   tree.get(1, last: true)  # => "second"
   def value(key, last: false) = @hash_index[key]&.value&.send(last ? :last : :first)
+  alias :get :value
+  alias :[] :value
 
   # Retrieves the first value associated with the given key.
   #
@@ -1521,7 +1525,7 @@ class MultiRBTree < RBTree
   #   tree.insert(1, 'second')
   #   tree.values(1).to_a   # => ["first", "second"]
   def values(key, reverse: false)
-    return enum_for(:values, key) { value_count(key) } unless block_given?
+    return enum_for(__method__, key) { value_count(key) } unless block_given?
     @hash_index[key]&.value&.send(reverse ? :reverse_each : :each) { |v| yield v }
   end
   alias :get_all :values
@@ -1622,6 +1626,7 @@ class MultiRBTree < RBTree
     delete_indexed_node(z.key)
     value
   end
+  alias :delete :delete_key
 
   # Removes and returns the first key-value pair.
   #
