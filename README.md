@@ -236,12 +236,6 @@ All major operations run in **O(log n)** time:
 
 Iteration over all elements takes O(n) time.
 
-### Memory Efficiency
-
-RBTree uses an internal **Memory Pool** to recycle node objects. 
-- Significantly reduces Garbage Collection (GC) pressure during frequent insertions and deletions (e.g., in high-throughput queues).
-- In benchmarks with 100,000 cyclic operations, **GC time was 0.0s** compared to significant pauses without pooling.
-
 ### RBTree vs Hash vs Array (Overwhelming Power)
 
 For ordered and spatial operations, RBTree is not just faster—it is in a completely different class. The following benchmarks were conducted with **500,000 items**:
@@ -253,6 +247,23 @@ For ordered and spatial operations, RBTree is not just faster—it is in a compl
 | **Min Extraction** | **O(log n)** | O(n) search | **~160x faster** | Continuous rebalancing vs full scan |
 | **Sorted Iteration** | **O(n)** | O(n log n) | **FREE** | Always sorted vs explicit `sort` |
 | **Key Lookup** | **O(1)** | O(1) | **Equal** | **Hybrid Hash Index provides O(1) access like standard Hash** |
+
+### Memory Efficiency & Custom Allocators
+
+RBTree uses an internal **Memory Pool** to recycle node objects. 
+- Significantly reduces Garbage Collection (GC) pressure during frequent insertions and deletions.
+- **Auto-Shrinking**: The default `AutoShrinkNodePool` automatically releases unused nodes back to Ruby's GC when the pool gets too large relative to current usage, preventing memory leaks in long-running applications with fluctuating workloads.
+- **Customization**: You can customize the pool behavior or provide your own allocator:
+
+```ruby
+# Customize auto-shrink parameters
+pool = RBTree::AutoShrinkNodePool.new(
+  history_size: 60,       # 1 minute history
+  buffer_factor: 1.5,     # Keep 50% buffer above fluctuation
+  reserve_ratio: 0.2      # Always keep 20% reserve
+)
+tree = RBTree.new(node_allocator: pool)
+```
 
 ### When to Use RBTree
 

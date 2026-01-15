@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-01-15
+
+### Added
+- **Custom Node Allocator**: `RBTree#initialize` now accepts a `node_allocator:` keyword argument, allowing customization of the node pooling strategy.
+- **AutoShrinkNodePool**: Introduced `RBTree::AutoShrinkNodePool` as the default allocator. It automatically releases memory back to the GC when the pool size exceeds the fluctuation range of recent active node counts, preventing memory bloat in long-running processes with variable loads.
+- **Explicit Overwrite**: `overwrite: true` is now the explicit default for `initialize` and `insert`.
+
 ## [0.3.1] - 2026-01-15
 
 ### Added
@@ -191,6 +198,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.3.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.2
+[0.3.1]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.1
 [0.3.0]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.0
 [0.2.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.3
 [0.2.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.2.2

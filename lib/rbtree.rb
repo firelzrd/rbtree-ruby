@@ -77,6 +77,7 @@ class RBTree
   #
   # @param args [Hash, Array, nil] optional initial data
   # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
+  # @param node_allocator [NodeAllocator] allocator instance to use (default: AutoShrinkNodePool.new)
   # @yieldreturn [Object] optional initial data
   #   - If a Hash is provided, each key-value pair is inserted into the tree
   #   - If an Array is provided, it should contain [key, value] pairs
@@ -91,7 +92,7 @@ class RBTree
   #   tree = RBTree.new([[1, 'one'], [2, 'two']])
   # @example Create with overwrite: false
   #   tree = RBTree.new([[1, 'one'], [1, 'uno']], overwrite: false)
-  def initialize(*args, overwrite: true, &block)
+  def initialize(*args, overwrite: true, node_allocator: AutoShrinkNodePool.new, &block)
     @nil_node = Node.new
     @nil_node.color = Node::BLACK
     @nil_node.left = @nil_node
@@ -99,8 +100,10 @@ class RBTree
     @root = @nil_node
     @min_node = @nil_node
     @hash_index = {}  # Hash index for O(1) key lookup
-    @node_pool = []   # Memory pool for recycling nodes
+    @node_allocator = node_allocator
     @key_count = 0
+
+    @overwrite = overwrite
 
     if args.size > 0 || block_given?
       insert(*args, overwrite: overwrite, &block)
@@ -303,7 +306,7 @@ class RBTree
   #   tree.insert({1 => 'one', 2 => 'two'})
   # @example Bulk insert from Array
   #   tree.insert([[1, 'one'], [2, 'two']])
-  def insert(*args, overwrite: true, &block)
+  def insert(*args, overwrite: @overwrite, &block)
     if args.size == 2
       key, value = args
       insert_entry(key, value, overwrite: overwrite)
@@ -1326,30 +1329,17 @@ class RBTree
   # Allocates a new node or recycles one from the pool.
   # @return [Node]
   def allocate_node(key, value, color, left, right, parent)
-    node = @node_pool.pop
-    if node
-      node.key = key
-      node.value = value
-      node.color = color
-      node.left = left
-      node.right = right
-      node.parent = parent
-      node
-    else
-      node = Node.new(key, value, color, left, right, parent)
-    end
+    node = @node_allocator.allocate(key, value, color, left, right, parent)
     @key_count += 1
     node
   end
 
   # Releases a node back to the pool.
   # @param node [Node] the node to release
+  # Releases a node back to the pool.
+  # @param node [Node] the node to release
   def release_node(node)
-    node.left = nil
-    node.right = nil
-    node.parent = nil
-    node.value = nil # Help GC
-    @node_pool << node
+    @node_allocator.release(node)
     @key_count -= 1
   end
 
@@ -1789,4 +1779,204 @@ class RBTree::Node
   # Returns the key-value pair.
   # @return [Array(Object, Object)] the key-value pair
   def pair = [key, value]
+end
+
+# Allocator for RBTree nodes.
+#
+# @api private
+class RBTree::NodeAllocator
+  # Allocates a new node.
+    #
+  # @param key [Object] the key
+  # @param value [Object] the value
+  # @param color [Boolean] the color (true=red, false=black)
+  # @param left [Node] the left child
+  # @param right [Node] the right child
+  # @param parent [Node] the parent node
+  def allocate(key, value, color, left, right, parent) = RBTree::Node.new(key, value, color, left, right, parent)
+
+  # Releases a node.
+  #
+  # @param node [Node] the node to release
+  def release(node) = nil
+end
+
+# Internal node pool for RBTree.
+#
+# Manages recycling of Node objects to reduce object allocation overhead.
+#
+# @api private
+class RBTree::NodePool < RBTree::NodeAllocator
+  def initialize
+    @pool = []
+  end
+
+  # Allocates a new node or recycles one from the pool.
+  #
+  # @param key [Object] the key
+  # @param value [Object] the value
+  # @param color [Boolean] the color (true=red, false=black)
+  # @param left [Node] the left child
+  # @param right [Node] the right child
+  # @param parent [Node] the parent node
+  def allocate(key, value, color, left, right, parent)
+    node = @pool.pop
+    if node
+      node.key = key
+      node.value = value
+      node.color = color
+      node.left = left
+      node.right = right
+      node.parent = parent
+      node
+    else
+      super
+    end
+  end
+
+  # Releases a node back to the pool.
+  #
+  # @param node [Node] the node to release
+  def release(node)
+    node.left = node.right = node.parent = node.value = node.key = nil
+    @pool << node
+  end
+end
+
+# Internal node pool for RBTree.
+#
+# Manages recycling of Node objects to reduce object allocation overhead.
+# Includes an auto-shrink mechanism to release memory back to GC when
+# the pool size exceeds the fluctuation range of recent active node count.
+#
+# This class can be used to customize the node allocation strategy by passing
+# an instance to {RBTree#initialize}.
+class RBTree::AutoShrinkNodePool < RBTree::NodePool
+  # Initializes a new AutoShrinkNodePool.
+  #
+  # @param max_maintenance_interval [Integer] maximum interval between maintenance checks (default: 1000)
+  # @param target_check_interval [Float] target interval in seconds for maintenance checks (default: 1.0)
+  # @param history_size [Integer] duration in seconds to keep history for fluctuation analysis (default: 120)
+  # @param buffer_factor [Float] buffer factor to apply to observed fluctuation (default: 1.25)
+  # @param reserve_ratio [Float] minimum reserve capacity as a ratio of max active nodes (default: 0.1)
+  def initialize(
+      max_maintenance_interval: 1000,
+      target_check_interval: 1.0,
+      history_size: 120,
+      buffer_factor: 1.25,
+      reserve_ratio: 0.1)
+    @pool = []
+    
+    @max_maintenance_interval = max_maintenance_interval
+    @target_check_interval = target_check_interval
+    @history_limit = history_size
+    @buffer_ratio = buffer_factor
+    @reserve_ratio = reserve_ratio
+    
+    @maintenance_count = 0
+    @check_interval = 1000
+    @check_count = 0
+    @avg_release_rate = nil
+    @last_check_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    
+    @active_nodes = 0
+    @global_max_active = 0
+    @global_min_active = 0
+    @max_active_in_interval = 0
+    @min_active_in_interval = 0
+    @history = []
+    @current_target_capacity = Float::INFINITY
+  end
+
+  # Allocates a new node or recycles one from the pool.
+  #
+  # @param key [Object] the key
+  # @param value [Object] the value
+  # @param color [Boolean] the color (true=red, false=black)
+  # @param left [Node] the left child
+  # @param right [Node] the right child
+  # @param parent [Node] the parent node
+  def allocate(key, value, color, left, right, parent)
+    @active_nodes += 1
+    @max_active_in_interval = @active_nodes if @active_nodes > @max_active_in_interval
+    super
+  end
+
+  # Releases a node back to the pool.
+  #
+  # Checks auto-shrink logic to decide whether to keep the node or let it be GC'd.
+  #
+  # @param node [Node] the node to release
+  def release(node)
+    @active_nodes -= 1
+    @min_active_in_interval = @active_nodes if @active_nodes < @min_active_in_interval
+
+    @check_count += 1
+    
+    perform_maintenance if @check_count >= @check_interval
+
+    super if @pool.size < @current_target_capacity
+  end
+
+  private
+
+  def perform_maintenance
+    @maintenance_count += 1
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    elapsed = now - @last_check_time
+    return if elapsed <= 0
+    
+    current_rate = @check_count / elapsed
+    
+    if @avg_release_rate.nil?
+      @avg_release_rate = current_rate
+    else
+      @avg_release_rate = (@avg_release_rate * 3 + current_rate) / 4
+    end
+    
+    @check_interval = [[(@avg_release_rate * @target_check_interval).to_i, 1].max, @max_maintenance_interval].min
+    
+    expired_min = false
+    expired_max = false
+    needs_recalc = false
+
+    cutoff_time = now - @history_limit
+    while !@history.empty? && @history.first[0] < cutoff_time
+      if !expired_min && @history.first[1] == @global_min_active
+        expired_min = true
+        needs_recalc = true
+      end
+      if !expired_max && @history.first[2] == @global_max_active
+        expired_max = true
+        needs_recalc = true
+      end
+      @history.shift
+    end
+
+    @history << [now, @min_active_in_interval, @max_active_in_interval]
+
+    if @min_active_in_interval < @global_min_active
+      @global_min_active = @min_active_in_interval
+      expired_min = false
+      needs_recalc = true
+    end
+    if @max_active_in_interval > @global_max_active
+      @global_max_active = @max_active_in_interval
+      expired_max = false
+      needs_recalc = true
+    end
+
+    @global_min_active = @history.map { |_, min, _| min }.min if expired_min
+    @global_max_active = @history.map { |_, _, max| max }.max if expired_max
+    if needs_recalc
+      fluctuation = @global_max_active - @global_min_active
+      reserve = (@reserve_ratio * @global_max_active).to_i
+      @current_target_capacity = [(fluctuation * @buffer_ratio).to_i, reserve].max
+    end
+    
+    @check_count = 0
+    @last_check_time = now
+    @max_active_in_interval = @active_nodes
+    @min_active_in_interval = @active_nodes
+  end
 end
