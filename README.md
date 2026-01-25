@@ -80,8 +80,15 @@ tree.max  # => [20, "twenty"]
 
 # Range queries (return Enumerator, use .to_a for Array)
 tree.lt(10).to_a   # => [[1, "one"], [2, "two"], [3, "three"]]
-tree.gte(10).to_a  # => [[10, "ten"], [20, "twenty"]]
+tree.gte(10).each { |k, v| puts k } # Block iteration
 tree.between(2, 10).to_a  # => [[2, "two"], [3, "three"], [10, "ten"]]
+
+# Range objects in [] (v0.3.4+)
+tree[..10].to_a    # lte(10)
+tree[2..10].each { |k, v| ... } # Block iteration on Range
+tree[2...10].to_a  # between(2, 10, include_max: false)
+tree[10..].to_a    # gte(10)
+tree[2..10, reverse: true].to_a # with options
 
 # Shift and pop
 tree.shift  # => [1, "one"] (removes minimum)

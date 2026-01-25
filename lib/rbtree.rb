@@ -191,11 +191,35 @@ class RBTree
   # @example
   #   tree = RBTree.new({1 => 'one', 2 => 'two'})
   #   tree.get(1)  # => "one"
-  #   tree[2]      # => "two"
-  #   tree[3]      # => nil
   def value(key) = @hash_index[key]&.value
   alias :get :value
-  alias :[] :value
+
+  # Retrieves a value associated with the given key, or a range of entries if a Range is provided.
+  #
+  # @param key_or_range [Object, Range] the key to look up or a Range for query
+  # @param ... [Hash] additional options to pass to the respective lookup method
+  # @return [Object, Enumerator, nil]
+  #   - If a key is provided: the associated value, or nil if not found
+  #   - If a Range is provided: an Enumerator yielding [key, value] pairs
+  # @example Single key lookup
+  #   tree[2]      # => "two"
+  # @example Range lookup
+  #   tree[2..4].to_a  # => [[2, "two"], [3, "three"], [4, "four"]]
+  #   tree[...3].to_a  # => [[1, "one"], [2, "two"]]
+  def [](key_or_range, **)
+    return value(key_or_range, **) if !key_or_range.is_a?(Range)
+
+    r = key_or_range
+    r.begin ? (
+      r.end ?
+        between(r.begin, r.end, include_max: !r.exclude_end?, **) :
+        gte(r.begin, **)
+    ) : (
+      r.end ?
+        (r.exclude_end? ? lt(r.end, **) : lte(r.end, **)) :
+        each(**)
+    )
+  end
 
   # Returns the key with the key closest to the given key.
   #
@@ -1499,7 +1523,6 @@ class MultiRBTree < RBTree
   #   tree.get(1, last: true)  # => "second"
   def value(key, last: false) = @hash_index[key]&.value&.send(last ? :last : :first)
   alias :get :value
-  alias :[] :value
 
   # Retrieves the first value associated with the given key.
   #

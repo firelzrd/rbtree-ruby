@@ -80,8 +80,15 @@ tree.max  # => [20, "twenty"]
 
 # 範囲クエリ（Enumeratorを返す、配列には.to_aを使用）
 tree.lt(10).to_a   # => [[1, "one"], [2, "two"], [3, "three"]]
-tree.gte(10).to_a  # => [[10, "ten"], [20, "twenty"]]
+tree.gte(10).each { |k, v| puts k } # ブロック渡しでのループ
 tree.between(2, 10).to_a  # => [[2, "two"], [3, "three"], [10, "ten"]]
+
+# []でのRangeオブジェクトの利用 (v0.3.4+)
+tree[..10].to_a    # lte(10)相当
+tree[2..10].each { |k, v| ... } # Rangeでのループ
+tree[2...10].to_a  # between(2, 10, include_max: false)相当
+tree[10..].to_a    # gte(10)相当
+tree[2..10, reverse: true].to_a # オプション指定可能
 
 # shiftとpop
 tree.shift  # => [1, "one"] (最小値を削除)

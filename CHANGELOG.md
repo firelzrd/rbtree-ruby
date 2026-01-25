@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-01-25
+
+### Added
+- **Range-based Lookup**: Support for passing `Range` objects to the bracket operator `[]`.
+  - `tree[2..4]` -> `between(2, 4)`
+  - `tree[2...4]` -> `between(2, 4, include_max: false)`
+  - `tree[5..]` -> `gte(5)`
+  - `tree[..10]` -> `lte(10)`
+  - `tree[...10]` -> `lt(10)`
+  - Returns an `Enumerator` of `[key, value]` pairs.
+  - *Note: `gt` (greater than exclusive) is not covered by standard Ruby Range syntax and remains available via the `gt` method.*
+
 ## [0.3.3] - 2026-01-23
 
 ### Optimized
@@ -207,6 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.3.4]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.4
+[0.3.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.3
 [0.3.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.2
 [0.3.1]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.1
 [0.3.0]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.0

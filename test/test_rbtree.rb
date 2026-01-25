@@ -41,6 +41,35 @@ class TestRBTree < Minitest::Test
     assert_equal 'one', tree[1]
   end
 
+  def test_bracket_range_lookup
+    @tree.insert({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four', 5 => 'five'})
+    # Inclusive range
+    assert_equal [[2, 'two'], [3, 'three'], [4, 'four']], @tree[2..4].to_a
+    
+    # Exclusive range
+    assert_equal [[2, 'two'], [3, 'three']], @tree[2...4].to_a
+    
+    # Endless range (if supported by Ruby version)
+    if (2..).respond_to?(:begin)
+      assert_equal [[3, 'three'], [4, 'four'], [5, 'five']], @tree[3..].to_a
+    end
+    
+    # Beginless range
+    begin
+      r = eval("..3")
+      assert_equal [[1, 'one'], [2, 'two'], [3, 'three']], @tree[r].to_a
+      
+      r_ex = eval("...3")
+      assert_equal [[1, 'one'], [2, 'two']], @tree[r_ex].to_a
+    rescue SyntaxError, NameError
+      # Skip if old Ruby
+    end
+  end
+
+  def test_bracket_keywords_error
+    assert_raises(ArgumentError) { @tree[3, last: true] }
+  end
+
   # ============================================================
   # Empty Tree Edge Cases
   # ============================================================
@@ -1379,6 +1408,51 @@ class TestMultiRBTree < Minitest::Test
     result = @tree.lt(3, reverse: true).to_a
     # Reverse: highest key first, then values in reverse order
     assert_equal [[2, 'y'], [2, 'x'], [1, 'b'], [1, 'a']], result
+  end
+
+  # ============================================================
+  # Bracket Range Tests
+  # ============================================================
+
+  def test_multi_bracket_range_lookup
+    @tree.insert(1, 'a1')
+    @tree.insert(1, 'a2')
+    @tree.insert(2, 'b1')
+    @tree.insert(3, 'c1')
+    @tree.insert(3, 'c2')
+
+    # inclusive
+    assert_equal [[1, 'a1'], [1, 'a2'], [2, 'b1']], @tree[1..2].to_a
+    
+    # exclusive
+    assert_equal [[1, 'a1'], [1, 'a2']], @tree[1...2].to_a
+
+    # with options (reverse)
+    assert_equal [[2, 'b1'], [1, 'a2'], [1, 'a1']], @tree[1..2, reverse: true].to_a
+  end
+
+  def test_multi_bracket_single_lookup_with_keywords
+    @tree.insert(1, 'a1')
+    @tree.insert(1, 'a2')
+    assert_equal 'a1', @tree[1]
+    assert_equal 'a2', @tree[1, last: true]
+  end
+
+  def test_multi_bracket_range_iteration
+    @tree.insert(1, 'a1')
+    @tree.insert(1, 'a2')
+    @tree.insert(2, 'b1')
+
+    yielded = []
+    @tree[1..2].each do |pair|
+      yielded << pair
+    end
+    assert_equal [[1, 'a1'], [1, 'a2'], [2, 'b1']], yielded
+  end
+
+  def test_multi_bracket_range_keywords_error
+    @tree.insert(1, 'a1')
+    assert_raises(ArgumentError) { @tree[1..2, last: true].to_a }
   end
 
   # ============================================================
