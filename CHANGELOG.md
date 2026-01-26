@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-01-26
+
+### Optimized
+- **O(1) Max Access**: Added cached `@max_node` to ensure `max` and `pop` operations run in constant time.
+- **Traversal Engine Rewrite**: Optimized all range queries (`lt`, `gt`, `between`, `each`) with a unified traversal engine featuring $O(1)$ range rejection and bound optimization.
+- **Fast-path Startup**: Range queries now leverage the hybrid Hash index to jump directly to target nodes (even for exclusive bounds), eliminating $O(\log N)$ tree descents when keys exist.
+
+### Changed
+- **Defensive Assertion**: Added an explicit check to `find_nearest_node` to ensure only `Numeric` keys are accepted, formalizing a pre-existing design constraint.
+- **Internal Refactoring**: Unified the insertion logic between `RBTree` and `MultiRBTree` into a single internal method to improve maintainability and ensure consistent optimization.
+
 ## [0.3.4] - 2026-01-25
 
 ### Added
@@ -219,6 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.3.5]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.5
 [0.3.4]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.4
 [0.3.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.3
 [0.3.2]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.2

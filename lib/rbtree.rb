@@ -99,6 +99,7 @@ class RBTree
     @nil_node.right = @nil_node
     @root = @nil_node
     @min_node = @nil_node
+    @max_node = @nil_node
     @hash_index = {}  # Hash index for O(1) key lookup
     @node_allocator = node_allocator
     @key_count = 0
@@ -418,7 +419,7 @@ class RBTree
   #   tree.pop  # => [3, "three"]
   #   tree.pop  # => [2, "two"]
   def pop
-    return nil unless (n = rightmost(@root)) != @nil_node
+    return nil unless (n = @max_node) != @nil_node
     pair = n.pair
     delete(n.key)
     pair
@@ -428,7 +429,7 @@ class RBTree
   #
   # @return [RBTree] self
   def clear
-    @root = @min_node = @nil_node
+    @root = @min_node = @max_node = @nil_node
     @hash_index.clear
     @key_count = 0
     self
@@ -484,11 +485,7 @@ class RBTree
   #   end
   def each(reverse: false, safe: false, &block)
     return enum_for(__method__, reverse: reverse, safe: safe) { size } unless block_given?
-    if reverse
-      traverse_all_desc(@root, safe: safe, &block)
-    else
-      traverse_all_asc(@root, safe: safe, &block)
-    end
+    traverse_range(reverse, nil, nil, false, false, safe: safe, &block)
     self
   end
 
@@ -530,11 +527,7 @@ class RBTree
   #   tree.lt(3, safe: true) { |k, _| tree.delete(k) if k.even? }  # safe to delete
   def lt(key, reverse: false, safe: false, &block)
     return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
-    if reverse
-      traverse_lt_desc(@root, key, safe: safe, &block)
-    else
-      traverse_lt_asc(@root, key, safe: safe, &block)
-    end
+    traverse_range(reverse, nil, key, false, false, safe: safe, &block)
     self
   end
 
@@ -551,11 +544,7 @@ class RBTree
   #   tree.lte(3, reverse: true).first  # => [3, "three"]
   def lte(key, reverse: false, safe: false, &block)
     return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
-    if reverse
-      traverse_lte_desc(@root, key, safe: safe, &block)
-    else
-      traverse_lte_asc(@root, key, safe: safe, &block)
-    end
+    traverse_range(reverse, nil, key, false, true, safe: safe, &block)
     self
   end
 
@@ -572,11 +561,7 @@ class RBTree
   #   tree.gt(2, reverse: true).first  # => [4, "four"]
   def gt(key, reverse: false, safe: false, &block)
     return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
-    if reverse
-      traverse_gt_desc(@root, key, safe: safe, &block)
-    else
-      traverse_gt_asc(@root, key, safe: safe, &block)
-    end
+    traverse_range(reverse, key, nil, false, false, safe: safe, &block)
     self
   end
 
@@ -593,11 +578,7 @@ class RBTree
   #   tree.gte(2, reverse: true).first  # => [4, "four"]
   def gte(key, reverse: false, safe: false, &block)
     return enum_for(__method__, key, reverse: reverse, safe: safe) unless block_given?
-    if reverse
-      traverse_gte_desc(@root, key, safe: safe, &block)
-    else
-      traverse_gte_asc(@root, key, safe: safe, &block)
-    end
+    traverse_range(reverse, key, nil, true, false, safe: safe, &block)
     self
   end
 
@@ -617,11 +598,7 @@ class RBTree
   #   tree.between(2, 4, reverse: true).first  # => [4, "four"]
   def between(min, max, include_min: true, include_max: true, reverse: false, safe: false, &block)
     return enum_for(__method__, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
-    if reverse
-      traverse_between_desc(@root, min, max, include_min, include_max, safe: safe, &block)
-    else
-      traverse_between_asc(@root, min, max, include_min, include_max, safe: safe, &block)
-    end
+    traverse_range(reverse, min, max, include_min, include_max, safe: safe, &block)
     self
   end
 
@@ -655,9 +632,8 @@ class RBTree
   # @!visibility private
   private
 
-  def min_node = ((n = @min_node) == @nil_node) ? nil : n
-
-  def max_node = ((n = rightmost(@root)) == @nil_node) ? nil : n
+  def min_node = (@min_node == @nil_node) ? nil : @min_node
+  def max_node = (@max_node == @nil_node) ? nil : @max_node
 
   # Inserts a single key-value pair.
   #
@@ -666,27 +642,51 @@ class RBTree
   # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
   # @return [Boolean, nil] true if inserted/updated, nil if key exists and overwrite is false
   def insert_entry(key, value, overwrite: true)
-    if (node = @hash_index[key])
-      return nil unless overwrite
-      node.value = value
-      return true
+    insert_entry_generic(key) do |node, is_new|
+      if is_new
+        value
+      else
+        if overwrite
+          node.value = value
+          true
+        else
+          nil
+        end
+      end
     end
+  end
+
+  # Generic entry insertion logic shared between RBTree and MultiRBTree.
+  #
+  # @param key [Object] the key to insert
+  # @yield [node, is_new] yields the existing node (if any) and whether it's a new insertion
+  # @yieldparam node [Node, nil] the existing node or nil
+  # @yieldparam is_new [Boolean] true if no node with the key exists
+  # @yieldreturn [Object]
+  #   - if is_new: the initial value for the new node
+  #   - if !is_new: the value to return from insert_entry
+  def insert_entry_generic(key)
+    if (node = @hash_index[key])
+      return yield(node, false)
+    end
+
     y = @nil_node
     x = @root
     while x != @nil_node
       y = x
       cmp = key <=> x.key
       if cmp == 0
-        return nil unless overwrite
-        x.value = value
-        return true
+        return yield(x, false)
       elsif cmp < 0
         x = x.left
       else
         x = x.right
       end
     end
-    z = allocate_node(key, value, Node::RED, @nil_node, @nil_node, @nil_node)
+
+    initial_value = yield(nil, true)
+
+    z = allocate_node(key, initial_value, Node::RED, @nil_node, @nil_node, @nil_node)
     z.parent = y
     if y == @nil_node
       @root = z
@@ -703,14 +703,34 @@ class RBTree
     if @min_node == @nil_node || (key <=> @min_node.key) < 0
       @min_node = z
     end
+    if @max_node == @nil_node || (key <=> @max_node.key) > 0
+      @max_node = z
+    end
     
-    @hash_index[key] = z  # Add to hash index
+    @hash_index[key] = z
     true
   end
 
+  # Traverses the tree in a specified direction (ascending or descending).
+  #
+  # @param direction [Boolean] true for descending, false for ascending
+  # @param min [Object] the lower bound (inclusive)
+  # @param max [Object] the upper bound (inclusive)
+  # @param include_min [Boolean] whether to include the lower bound
+  # @param include_max [Boolean] whether to include the upper bound
+  # @param safe [Boolean] whether to use safe traversal
+  # @yield [key, value] each key-value pair in the specified direction
+  # @return [void]
+  def traverse_range(direction, min, max, include_min, include_max, safe: false, &block)
+    if direction
+      traverse_range_desc(min, max, include_min, include_max, safe: safe, &block)
+    else
+      traverse_range_asc(min, max, include_min, include_max, safe: safe, &block)
+    end
+  end
+
   # Traverses the tree in ascending order (in-order traversal).
   #
-  # @param node [Node] the current node
   # @param min [Object] the lower bound (inclusive)
   # @param max [Object] the upper bound (inclusive)
   # @param include_min [Boolean] whether to include the lower bound
@@ -718,56 +738,31 @@ class RBTree
   # @param safe [Boolean] whether to use safe traversal
   # @yield [key, value] each key-value pair in ascending order
   # @return [void]
-  def traverse_range_asc(node, min, max, include_min, include_max, safe: false, &block)
+  def traverse_range_asc(min, max, include_min, include_max, safe: false, &block)
+    # O(1) Range Rejection
+    return if min && @max_node != @nil_node && (min <=> @max_node.key) > 0
+    return if min && @max_node != @nil_node && !include_min && (min <=> @max_node.key) == 0
+
+    # O(1) Bound Optimization
+    max = nil if max && @max_node != @nil_node && (cmp = max <=> @max_node.key) >= 0 && (cmp > 0 || include_max)
+
     if safe
       pair = !min ? find_min :
         include_min && @hash_index[min]&.pair || find_successor(min)
-      if !max
-        while pair
-          current_key = pair[0]
-          yield pair
-          pair = find_successor(current_key)
-        end
-      else
-        while pair && pair[0] < max
-          current_key = pair[0]
-          yield pair
-          pair = find_successor(current_key)
-        end
+      while pair && (!max || pair[0] < max)
+        current_key = pair[0]
+        yield pair
+        pair = find_successor(current_key)
       end
       yield pair if pair && max && include_max && pair[0] == max
     else
-      stack = []
-      current = node
-      while current != @nil_node || !stack.empty?
-        while current != @nil_node
-          if min && ((current.key <=> min) < 0 ||
-              (!include_min && (current.key <=> min) == 0))
-            current = current.right
-          else
-            stack << current
-            current = current.left
-          end
-        end
-        
-        if !stack.empty?
-          current = stack.pop
-          
-          if max && ((current.key <=> max) > 0 ||
-              (!include_max && (current.key <=> max) == 0))
-            return
-          else
-            yield current.pair
-            current = current.right
-          end
-        end
-      end
+      start_node, stack = resolve_startup_asc(min, include_min)
+      traverse_from_asc(start_node, stack, max, include_max, &block)
     end
   end
 
   # Traverses the tree in descending order (reverse in-order traversal).
   #
-  # @param node [Node] the current node
   # @param min [Object] the lower bound (inclusive)
   # @param max [Object] the upper bound (inclusive)
   # @param include_min [Boolean] whether to include the lower bound
@@ -775,164 +770,218 @@ class RBTree
   # @param safe [Boolean] whether to use safe traversal
   # @yield [key, value] each key-value pair in descending order
   # @return [void]
-  def traverse_range_desc(node, min, max, include_min, include_max, safe: false, &block)
+  def traverse_range_desc(min, max, include_min, include_max, safe: false, &block)
+    # O(1) Range Rejection
+    return if max && @min_node != @nil_node && (max <=> @min_node.key) < 0
+    return if max && @min_node != @nil_node && !include_max && (max <=> @min_node.key) == 0
+
+    # O(1) Bound Optimization
+    min = nil if min && @min_node != @nil_node && (cmp = min <=> @min_node.key) <= 0 && (cmp < 0 || include_min)
+
     if safe
       pair = !max ? find_max :
         include_max && @hash_index[max]&.pair || find_predecessor(max)
-      if !min
-        while pair
-          current_key = pair[0]
-          yield pair
-          pair = find_predecessor(current_key)
-        end
-      else
-        while pair && pair[0] > min
-          current_key = pair[0]
-          yield pair
-          pair = find_predecessor(current_key)
-        end
+      while pair && (!min || pair[0] > min)
+        current_key = pair[0]
+        yield pair
+        pair = find_predecessor(current_key)
       end
       yield pair if pair && min && include_min && pair[0] == min
     else
-      stack = []
-      current = node
-      while current != @nil_node || !stack.empty?
-        while current != @nil_node
-          if max && ((current.key <=> max) > 0 ||
-              (!include_max && (current.key <=> max) == 0))
-            current = current.left
-          else
-            stack << current
-            current = current.right
-          end
-        end
-        
-        if !stack.empty?
-          current = stack.pop
-          
-          if min && ((current.key <=> min) < 0 ||
-              (!include_min && (current.key <=> min) == 0))
+      start_node, stack = resolve_startup_desc(max, include_max)
+      traverse_from_desc(start_node, stack, min, include_min, &block)
+    end
+  end
+
+  private
+  
+  # Returns the predecessor of the given node.
+  #
+  # @param node [Node] the node to find the predecessor of
+  # @return [Node] the predecessor node
+  def predecessor_node_of(node)
+    if node.left != @nil_node
+      return rightmost(node.left)
+    end
+    y = node.parent
+    while y != @nil_node && node == y.left
+      node = y
+      y = y.parent
+    end
+    y
+  end
+
+  # Returns the successor of the given node.
+  #
+  # @param node [Node] the node to find the successor of
+  # @return [Node] the successor node
+  def successor_node_of(node)
+    if node.right != @nil_node
+      return leftmost(node.right)
+    end
+    y = node.parent
+    while y != @nil_node && node == y.right
+      node = y
+      y = y.parent
+    end
+    y
+  end
+
+  # Resolves the startup node for ascending traversal.
+  #
+  # @param min [Object] the minimum key to traverse from
+  # @param include_min [Boolean] whether to include the minimum key
+  # @return [Array(Node, Array)] the starting node and stack
+  def resolve_startup_asc(min, include_min)
+    # 1. Use cached min if no lower bound or if min is less than tree min
+    if @min_node != @nil_node && (!min || (min <=> @min_node.key) < 0)
+      return [@min_node, reconstruct_stack_asc(@min_node)]
+    end
+    
+    # 2. Use Hash index if key exists
+    if min && (node = @hash_index[min])
+      start_node = include_min ? node : successor_node_of(node)
+      return [start_node, reconstruct_stack_asc(start_node)]
+    end
+
+    # 3. Fallback to tree search from root
+    stack = []
+    current = @root
+    while current != @nil_node
+      if min && ((current.key <=> min) < 0 || (!include_min && (current.key <=> min) == 0))
+        current = current.right
+      else
+        stack << current
+        current = current.left
+      end
+    end
+    [@nil_node, stack]
+  end
+
+  # Reconstructs the stack for ascending traversal.
+  #
+  # @param node [Node] the node to reconstruct the stack from
+  # @return [Array] the reconstructed stack
+  def reconstruct_stack_asc(node)
+    return [] if node == @nil_node
+    stack = []
+    curr = node
+    while (p = curr.parent) != @nil_node
+      stack << p if curr == p.left
+      curr = p
+    end
+    stack.reverse!
+    stack
+  end
+
+  # Traverses the tree in ascending order.
+  #
+  # @param current [Node] the current node
+  # @param stack [Array] the stack of nodes to traverse
+  # @param max [Object] the maximum key to traverse to
+  # @param include_max [Boolean] whether to include the maximum key
+  # @yield [Array(Object, Object)] each key-value pair
+  # @yieldparam key [Object] the key
+  # @yieldparam val [Object] the value
+  def traverse_from_asc(current, stack, max, include_max, &block)
+    while current != @nil_node || !stack.empty?
+      if current != @nil_node
+        if max
+          cmp = current.key <=> max
+          if cmp >= 0
+            yield current.pair if include_max && cmp == 0
             return
-          else
-            yield current.pair
-            current = current.left
           end
         end
+        yield current.pair
+        current = current.right
+        while current != @nil_node
+          stack << current
+          current = current.left
+        end
+      else
+        current = stack.pop
       end
     end
   end
 
-  # Traverses the tree in ascending order (in-order traversal).
+  # Resolves the startup node for descending traversal.
   #
-  # @param node [Node] the current node
-  # @yield [key, value] each key-value pair in ascending order
-  # @return [void]
-  def traverse_all_asc(node, safe: false, &block) =
-    traverse_range_asc(node, nil, nil, false, false, safe: safe, &block)
+  # @param max [Object] the maximum key to traverse from
+  # @param include_max [Boolean] whether to include the maximum key
+  # @return [Array(Node, Array)] the starting node and stack
+  def resolve_startup_desc(max, include_max)
+    # 1. Use cached max if no upper bound or if max is greater than tree max
+    if @max_node != @nil_node && (!max || (max <=> @max_node.key) > 0)
+      return [@max_node, reconstruct_stack_desc(@max_node)]
+    end
+  
+    # 2. Use Hash index if key exists
+    if max && (node = @hash_index[max])
+      start_node = include_max ? node : predecessor_node_of(node)
+      return [start_node, reconstruct_stack_desc(start_node)]
+    end
 
-  # Traverses the tree in descending order (reverse in-order traversal).
-  #
-  # @param node [Node] the current node
-  # @yield [key, value] each key-value pair in descending order
-  # @return [void]
-  def traverse_all_desc(node, safe: false, &block) =
-    traverse_range_desc(node, nil, nil, false, false, safe: safe, &block)
+    # 3. Fallback to tree search from root
+    stack = []
+    current = @root
+    while current != @nil_node
+      if max && ((current.key <=> max) > 0 || (!include_max && (current.key <=> max) == 0))
+        current = current.left
+      else
+        stack << current
+        current = current.right
+      end
+    end
+    [@nil_node, stack]
+  end
 
-  # Traverses nodes with keys less than the specified key.
+  # Reconstructs the stack for descending traversal.
   #
-  # @param node [Node] the current node
-  # @param key [Object] the upper bound (exclusive)
-  # @yield [key, value] each matching key-value pair
-  # @return [void]
-  def traverse_lt_asc(node, key, safe: false, &block) =
-    traverse_range_asc(node, nil, key, false, false, safe: safe, &block)
+  # @param node [Node] the node to reconstruct the stack from
+  # @return [Array] the reconstructed stack
+  def reconstruct_stack_desc(node)
+    return [] if node == @nil_node
+    stack = []
+    curr = node
+    while (p = curr.parent) != @nil_node
+      stack << p if curr == p.right
+      curr = p
+    end
+    stack.reverse!
+    stack
+  end
 
-  # Traverses nodes with keys less than or equal to the specified key.
+  # Traverses the tree in descending order.
   #
-  # @param node [Node] the current node
-  # @param key [Object] the upper bound (inclusive)
-  # @yield [key, value] each matching key-value pair
-  # @return [void]
-  def traverse_lte_asc(node, key, safe: false, &block) =
-    traverse_range_asc(node, nil, key, false, true, safe: safe, &block)
-
-  # Traverses nodes with keys greater than the specified key.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the lower bound (exclusive)
-  # @yield [key, value] each matching key-value pair
-  # @return [void]
-  def traverse_gt_asc(node, key, safe: false, &block) =
-    traverse_range_asc(node, key, nil, false, false, safe: safe, &block)
-
-  # Traverses nodes with keys greater than or equal to the specified key.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the lower bound (inclusive)
-  # @yield [key, value] each matching key-value pair
-  # @return [void]
-  def traverse_gte_asc(node, key, safe: false, &block) =
-    traverse_range_asc(node, key, nil, true, false, safe: safe, &block)
-
-  # Traverses nodes with keys within the specified range.
-  #
-  # @param node [Node] the current node
-  # @param min [Object] the lower bound
-  # @param max [Object] the upper bound
-  # @param include_min [Boolean] whether to include the lower bound
-  # @param include_max [Boolean] whether to include the upper bound
-  # @yield [key, value] each matching key-value pair
-  # @return [void]
-  def traverse_between_asc(node, min, max, include_min, include_max, safe: false, &block) =
-    traverse_range_asc(node, min, max, include_min, include_max, safe: safe, &block)
-
-  # Traverses nodes with keys less than the specified key in descending order.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the upper bound (exclusive)
-  # @yield [key, value] each matching key-value pair in descending order
-  # @return [void]
-  def traverse_lt_desc(node, key, safe: false, &block) =
-    traverse_range_desc(node, nil, key, false, false, safe: safe, &block)
-
-  # Traverses nodes with keys less than or equal to the specified key in descending order.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the upper bound (inclusive)
-  # @yield [key, value] each matching key-value pair in descending order
-  # @return [void]
-  def traverse_lte_desc(node, key, safe: false, &block) =
-    traverse_range_desc(node, nil, key, false, true, safe: safe, &block)
-
-  # Traverses nodes with keys greater than the specified key in descending order.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the lower bound (exclusive)
-  # @yield [key, value] each matching key-value pair in descending order
-  # @return [void]
-  def traverse_gt_desc(node, key, safe: false, &block) =
-    traverse_range_desc(node, key, nil, false, false, safe: safe, &block)
-
-  # Traverses nodes with keys greater than or equal to the specified key in descending order.
-  #
-  # @param node [Node] the current node
-  # @param key [Object] the lower bound (inclusive)
-  # @yield [key, value] each matching key-value pair in descending order
-  # @return [void]
-  def traverse_gte_desc(node, key, safe: false, &block) =
-    traverse_range_desc(node, key, nil, true, false, safe: safe, &block)
-
-  # Traverses nodes with keys within the specified range in descending order.
-  #
-  # @param node [Node] the current node
-  # @param min [Object] the lower bound
-  # @param max [Object] the upper bound
-  # @param include_min [Boolean] whether to include the lower bound
-  # @param include_max [Boolean] whether to include the upper bound
-  # @yield [key, value] each matching key-value pair in descending order
-  # @return [void]
-  def traverse_between_desc(node, min, max, include_min, include_max, safe: false, &block) =
-    traverse_range_desc(node, min, max, include_min, include_max, safe: safe, &block)
+  # @param current [Node] the current node
+  # @param stack [Array] the stack of nodes to traverse
+  # @param min [Object] the minimum key to traverse to
+  # @param include_min [Boolean] whether to include the minimum key
+  # @yield [Array(Object, Object)] each key-value pair
+  # @yieldparam key [Object] the key
+  # @yieldparam val [Object] the value
+  def traverse_from_desc(current, stack, min, include_min, &block)
+    while current != @nil_node || !stack.empty?
+      if current != @nil_node
+        if min
+          cmp = current.key <=> min
+          if cmp <= 0
+            yield current.pair if include_min && cmp == 0
+            return
+          end
+        end
+        yield current.pair
+        current = current.left
+        while current != @nil_node
+          stack << current
+          current = current.right
+        end
+      else
+        current = stack.pop
+      end
+    end
+  end
 
   # Restores red-black tree properties after insertion.
   #
@@ -1036,6 +1085,10 @@ class RBTree
     if next_min_node
       @min_node = next_min_node
     end
+    if z == @max_node
+       next_max_node = predecessor_node_of(z)
+       @max_node = next_max_node
+    end
 
     value = z.value
     release_node(z)
@@ -1128,6 +1181,13 @@ class RBTree
   # @param key [Numeric] the target key
   # @return [Node] the nearest node, or @nil_node if tree is empty
   def find_nearest_node(key)
+    raise ArgumentError, "key must be Numeric" unless key.is_a?(Numeric)
+
+    # If key is larger than max_key, return max_node
+    return @max_node if @max_node != @nil_node && key >= @max_node.key
+    # If key is smaller than min_key, return min_node
+    return @min_node if @min_node != @nil_node && key <= @min_node.key
+
     current = @root
     closest = @nil_node
     min_dist = nil
@@ -1168,21 +1228,11 @@ class RBTree
   # @param key [Object] the reference key
   # @return [Node] the predecessor node, or @nil_node if none exists
   def find_predecessor_node(key)
-    # Check if key exists using O(1) hash lookup
+    # If key is larger than max_key, return max_node
+    return @max_node if max_key && (key <=> max_key) > 0
+    # If key exists using O(1) hash lookup, return predecessor node
     if (node = @hash_index[key])
-      # Key exists: find predecessor in subtree or ancestors
-      if node.left != @nil_node
-        return rightmost(node.left)
-      else
-        # Walk up to find first ancestor where we came from the right
-        current = node
-        parent = current.parent
-        while parent != @nil_node && current == parent.left
-          current = parent
-          parent = parent.parent
-        end
-        return parent
-      end
+      return predecessor_node_of(node)
     end
 
     # Key doesn't exist: descend tree tracking the best candidate
@@ -1218,25 +1268,14 @@ class RBTree
   # @param key [Object] the reference key
   # @return [Node] the successor node, or @nil_node if none exists
   def find_successor_node(key)
+    # If key is larger than or equal to max_key, return nil
+    return @nil_node if max_key && (key <=> max_key) >= 0
     # If key is smaller than min_key, return min_node
-    return @min_node if min_key && key < min_key
-    # Check if key exists using O(1) hash lookup
+    return @min_node if min_key && (key <=> min_key) < 0
+    # If key exists using O(1) hash lookup, return successor node
     if (node = @hash_index[key])
-      # Key exists: find successor in subtree or ancestors
-      if node.right != @nil_node
-        return leftmost(node.right)
-      else
-        # Walk up to find first ancestor where we came from the left
-        current = node
-        parent = current.parent
-        while parent != @nil_node && current == parent.right
-          current = parent
-          parent = parent.parent
-        end
-        return parent
-      end
+      return successor_node_of(node)
     end
-
     # Key doesn't exist: descend tree tracking the best candidate
     current = @root
     successor = @nil_node
@@ -1292,7 +1331,7 @@ class RBTree
   # Returns the maximum key-value pair.
   #
   # @return [Array(Object, Object), nil] a two-element array [key, value], or nil if tree is empty
-  def find_max = ((n = rightmost(@root)) != @nil_node) && n.pair
+  def find_max = ((n = @max_node) != @nil_node) && n.pair
 
   # Performs a left rotation on the given node.
   #
@@ -1696,47 +1735,15 @@ class MultiRBTree < RBTree
   #   tree.insert(1, 'first')
   #   tree.insert(1, 'second')  # adds another value for key 1
   def insert_entry(key, value, **)
-    if (node = @hash_index[key])
-      node.value << value
+    insert_entry_generic(key) do |node, is_new|
       @value_count += 1
-      return true
-    end
-    y = @nil_node
-    x = @root
-    while x != @nil_node
-      y = x
-      cmp = key <=> x.key
-      if cmp == 0
-        x.value << value
-        @value_count += 1
-        return true
-      elsif cmp < 0
-        x = x.left
+      if is_new
+        [value]
       else
-        x = x.right
+        node.value << value
+        true
       end
     end
-    z = allocate_node(key, [value], Node::RED, @nil_node, @nil_node, @nil_node)
-    z.parent = y
-    if y == @nil_node
-      @root = z
-    elsif (key <=> y.key) < 0
-      y.left = z
-    else
-      y.right = z
-    end
-    z.left = @nil_node
-    z.right = @nil_node
-    z.color = Node::RED
-    insert_fixup(z)
-    @value_count += 1
-    
-    if @min_node == @nil_node || (key <=> @min_node.key) < 0
-      @min_node = z
-    end
-    
-    @hash_index[key] = z  # Add to hash index
-    true
   end
 
   # Traverses the tree in ascending order, yielding each key-value pair.

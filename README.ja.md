@@ -239,10 +239,9 @@ tree.max(last: true)      # => [2, "b"]      (最大キーの最後の値)
 - `delete(key)` - O(log n)
 - `value(key)` / `[]` - **O(1)** (内部ハッシュインデックスによる超高速アクセス)
 - `has_key?` - **O(1)** (内部ハッシュインデックスによる超高速チェック)
-- `min` - **O(1)**
-- `max` - O(log n)
+- `min` / `max` - **O(1)**
 - `shift` / `pop` - O(log n)
-- `prev` / `succ` - O(log n)、O(1)ハッシュチェック付き
+- `prev` / `succ` - O(log n)、O(1)ハッシュチェックと高速な走査開始により改善
 
 全要素のイテレーションはO(n)時間。
 

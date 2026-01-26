@@ -239,10 +239,9 @@ All major operations run in **O(log n)** time:
 - `delete(key)` - O(log n)
 - `value(key)` / `[]` - **O(1)** (hybrid hash index)
 - `has_key?` - **O(1)** (hybrid hash index)
-- `min` - **O(1)**
-- `max` - O(log n)
+- `min` / `max` - **O(1)**
 - `shift` / `pop` - O(log n)
-- `prev` / `succ` - O(log n) with O(1) hash check
+- `prev` / `succ` - O(log n) with O(1) hash check and faster startup
 
 Iteration over all elements takes O(n) time.
 
