@@ -1031,8 +1031,467 @@ class TestRBTree < Minitest::Test
   def test_merge_multirbtree_raises_error
     multi = MultiRBTree.new
     multi.insert(1, 'val')
-    
+
     assert_raises(ArgumentError) { @tree.merge!(multi) }
+  end
+
+  # ============================================================
+  # dup
+  # ============================================================
+
+  def test_dup_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    copy = @tree.dup
+    assert_equal @tree.to_a, copy.to_a
+    assert_instance_of RBTree, copy
+    assert copy.valid?
+  end
+
+  def test_dup_empty
+    copy = @tree.dup
+    assert_equal 0, copy.size
+    assert copy.empty?
+    assert copy.valid?
+  end
+
+  def test_dup_independence_delete_from_copy
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    copy = @tree.dup
+    copy.delete(1)
+    assert_equal 3, @tree.size
+    assert_equal 2, copy.size
+    assert_equal 'a', @tree[1]
+  end
+
+  def test_dup_independence_delete_from_original
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    copy = @tree.dup
+    @tree.delete(2)
+    assert_equal 1, @tree.size
+    assert_equal 2, copy.size
+    assert_equal 'b', copy[2]
+  end
+
+  def test_dup_independence_insert_into_copy
+    @tree.insert(1, 'a')
+    copy = @tree.dup
+    copy.insert(99, 'z')
+    assert_equal 1, @tree.size
+    assert_equal 2, copy.size
+    refute @tree.has_key?(99)
+  end
+
+  def test_dup_preserves_order
+    [5, 3, 7, 1, 4, 6, 8, 2].each { |k| @tree.insert(k, k.to_s) }
+    copy = @tree.dup
+    assert_equal (1..8).map { |k| [k, k.to_s] }, copy.to_a
+  end
+
+  def test_dup_single_element
+    @tree.insert(42, 'only')
+    copy = @tree.dup
+    assert_equal [[42, 'only']], copy.to_a
+    assert_equal [42, 'only'], copy.min
+    assert_equal [42, 'only'], copy.max
+    assert copy.valid?
+  end
+
+  def test_dup_large_tree
+    1000.times { |i| @tree.insert(i, "v#{i}") }
+    copy = @tree.dup
+    assert_equal 1000, copy.size
+    assert_equal @tree.to_a, copy.to_a
+    assert copy.valid?
+
+    # mutate both independently
+    500.times { |i| copy.delete(i) }
+    assert_equal 1000, @tree.size
+    assert_equal 500, copy.size
+    assert @tree.valid?
+    assert copy.valid?
+  end
+
+  def test_dup_min_max_correct
+    @tree.insert(3, 'c')
+    @tree.insert(1, 'a')
+    @tree.insert(5, 'e')
+    copy = @tree.dup
+    assert_equal [1, 'a'], copy.min
+    assert_equal [5, 'e'], copy.max
+  end
+
+  def test_dup_then_clear_original
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    copy = @tree.dup
+    @tree.clear
+    assert @tree.empty?
+    assert_equal 2, copy.size
+    assert_equal [[1, 'a'], [2, 'b']], copy.to_a
+  end
+
+  def test_dup_hash_index_independent
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    copy = @tree.dup
+    assert copy.has_key?(1)
+    assert copy.has_key?(2)
+    copy.delete(1)
+    refute copy.has_key?(1)
+    assert @tree.has_key?(1)
+  end
+
+  def test_dup_can_be_dupped_again
+    @tree.insert(1, 'a')
+    copy1 = @tree.dup
+    copy2 = copy1.dup
+    copy1.delete(1)
+    assert_equal [[1, 'a']], copy2.to_a
+    assert copy2.valid?
+  end
+
+  # ============================================================
+  # select
+  # ============================================================
+
+  def test_select_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    result = @tree.select { |k, _| k > 1 }
+    assert_instance_of RBTree, result
+    assert_equal [[2, 'b'], [3, 'c']], result.to_a
+    assert_equal 3, @tree.size
+  end
+
+  def test_select_none_match
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.select { |_, _| false }
+    assert result.empty?
+    assert result.valid?
+  end
+
+  def test_select_all_match
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.select { |_, _| true }
+    assert_equal @tree.to_a, result.to_a
+    assert_equal @tree.size, result.size
+  end
+
+  def test_select_empty_tree
+    result = @tree.select { |_, _| true }
+    assert result.empty?
+  end
+
+  def test_select_by_value
+    @tree.insert(1, 'keep')
+    @tree.insert(2, 'drop')
+    @tree.insert(3, 'keep')
+    result = @tree.select { |_, v| v == 'keep' }
+    assert_equal [[1, 'keep'], [3, 'keep']], result.to_a
+  end
+
+  def test_select_result_is_valid_tree
+    50.times { |i| @tree.insert(i, i.to_s) }
+    result = @tree.select { |k, _| k.even? }
+    assert result.valid?
+    assert_equal 25, result.size
+  end
+
+  def test_select_result_independent
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.select { |_, _| true }
+    result.delete(1)
+    assert_equal 2, @tree.size
+  end
+
+  def test_select_enumerator
+    @tree.insert(1, 'a')
+    e = @tree.select
+    assert_kind_of Enumerator, e
+    assert_equal 1, e.size
+  end
+
+  # ============================================================
+  # reject
+  # ============================================================
+
+  def test_reject_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    result = @tree.reject { |k, _| k > 1 }
+    assert_instance_of RBTree, result
+    assert_equal [[1, 'a']], result.to_a
+    assert_equal 3, @tree.size
+  end
+
+  def test_reject_none_match
+    @tree.insert(1, 'a')
+    result = @tree.reject { |_, _| false }
+    assert_equal @tree.to_a, result.to_a
+  end
+
+  def test_reject_all_match
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.reject { |_, _| true }
+    assert result.empty?
+  end
+
+  def test_reject_empty_tree
+    result = @tree.reject { |_, _| false }
+    assert result.empty?
+  end
+
+  def test_reject_result_is_valid_tree
+    50.times { |i| @tree.insert(i, i.to_s) }
+    result = @tree.reject { |k, _| k.odd? }
+    assert result.valid?
+    assert_equal 25, result.size
+  end
+
+  def test_reject_enumerator
+    e = @tree.reject
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # delete_if
+  # ============================================================
+
+  def test_delete_if_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    result = @tree.delete_if { |k, _| k.even? }
+    assert_same @tree, result
+    assert_equal [[1, 'a'], [3, 'c']], @tree.to_a
+  end
+
+  def test_delete_if_none_match
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.delete_if { |_, _| false }
+    assert_equal 2, @tree.size
+  end
+
+  def test_delete_if_all_match
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.delete_if { |_, _| true }
+    assert @tree.empty?
+    assert @tree.valid?
+  end
+
+  def test_delete_if_empty_tree
+    result = @tree.delete_if { |_, _| true }
+    assert_same @tree, result
+    assert @tree.empty?
+  end
+
+  def test_delete_if_large_tree_validity
+    100.times { |i| @tree.insert(i, i.to_s) }
+    @tree.delete_if { |k, _| k % 3 == 0 }
+    assert @tree.valid?
+    assert_equal 66, @tree.size  # 100 - 34
+    @tree.each { |k, _| refute_equal 0, k % 3 }
+  end
+
+  def test_delete_if_single_element_removed
+    @tree.insert(1, 'a')
+    @tree.delete_if { |_, _| true }
+    assert @tree.empty?
+    assert_nil @tree.min
+    assert_nil @tree.max
+  end
+
+  def test_delete_if_single_element_kept
+    @tree.insert(1, 'a')
+    @tree.delete_if { |_, _| false }
+    assert_equal 1, @tree.size
+  end
+
+  def test_delete_if_updates_min_max
+    (1..10).each { |i| @tree.insert(i, i.to_s) }
+    @tree.delete_if { |k, _| k <= 3 || k >= 8 }
+    assert_equal [4, '4'], @tree.min
+    assert_equal [7, '7'], @tree.max
+  end
+
+  def test_delete_if_by_value
+    @tree.insert(1, 'remove')
+    @tree.insert(2, 'keep')
+    @tree.insert(3, 'remove')
+    @tree.delete_if { |_, v| v == 'remove' }
+    assert_equal [[2, 'keep']], @tree.to_a
+  end
+
+  def test_delete_if_enumerator
+    e = @tree.delete_if
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # reject!
+  # ============================================================
+
+  def test_reject_bang_returns_self_when_changed
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.reject! { |k, _| k.even? }
+    assert_same @tree, result
+    assert_equal [[1, 'a']], @tree.to_a
+  end
+
+  def test_reject_bang_returns_nil_when_unchanged
+    @tree.insert(1, 'a')
+    result = @tree.reject! { |_, _| false }
+    assert_nil result
+    assert_equal 1, @tree.size
+  end
+
+  def test_reject_bang_empty_tree_returns_nil
+    result = @tree.reject! { |_, _| true }
+    assert_nil result
+  end
+
+  def test_reject_bang_all_removed
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.reject! { |_, _| true }
+    assert_same @tree, result
+    assert @tree.empty?
+  end
+
+  def test_reject_bang_valid_after
+    50.times { |i| @tree.insert(i, i.to_s) }
+    @tree.reject! { |k, _| k.even? }
+    assert @tree.valid?
+  end
+
+  def test_reject_bang_enumerator
+    e = @tree.reject!
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # keep_if
+  # ============================================================
+
+  def test_keep_if_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.insert(3, 'c')
+    result = @tree.keep_if { |k, _| k.odd? }
+    assert_same @tree, result
+    assert_equal [[1, 'a'], [3, 'c']], @tree.to_a
+  end
+
+  def test_keep_if_none_kept
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.keep_if { |_, _| false }
+    assert @tree.empty?
+    assert @tree.valid?
+  end
+
+  def test_keep_if_all_kept
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    @tree.keep_if { |_, _| true }
+    assert_equal 2, @tree.size
+  end
+
+  def test_keep_if_empty_tree
+    result = @tree.keep_if { |_, _| true }
+    assert_same @tree, result
+    assert @tree.empty?
+  end
+
+  def test_keep_if_updates_min_max
+    (1..10).each { |i| @tree.insert(i, i.to_s) }
+    @tree.keep_if { |k, _| k >= 5 && k <= 7 }
+    assert_equal [5, '5'], @tree.min
+    assert_equal [7, '7'], @tree.max
+  end
+
+  def test_keep_if_large_tree_validity
+    100.times { |i| @tree.insert(i, i.to_s) }
+    @tree.keep_if { |k, _| k.odd? }
+    assert @tree.valid?
+    assert_equal 50, @tree.size
+  end
+
+  def test_keep_if_enumerator
+    e = @tree.keep_if
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # select and reject are complementary
+  # ============================================================
+
+  def test_select_reject_complementary
+    20.times { |i| @tree.insert(i, i.to_s) }
+    selected = @tree.select { |k, _| k.even? }
+    rejected = @tree.reject { |k, _| k.even? }
+    assert_equal @tree.size, selected.size + rejected.size
+    combined = (selected.to_a + rejected.to_a).sort_by(&:first)
+    assert_equal @tree.to_a, combined
+  end
+
+  def test_delete_if_keep_if_complementary
+    20.times { |i| @tree.insert(i, i.to_s) }
+    tree1 = @tree.dup
+    tree2 = @tree.dup
+    tree1.delete_if { |k, _| k.even? }
+    tree2.keep_if { |k, _| k.even? }
+    assert_equal @tree.size, tree1.size + tree2.size
+  end
+
+  # --- invert ---
+
+  def test_invert_basic
+    tree = RBTree.new({1 => 'a', 2 => 'b', 3 => 'c'})
+    inv = tree.invert
+    assert_instance_of RBTree, inv
+    assert_equal [['a', 1], ['b', 2], ['c', 3]], inv.to_a
+  end
+
+  def test_invert_empty
+    inv = @tree.invert
+    assert_equal 0, inv.size
+  end
+
+  def test_invert_duplicate_values_overwrites
+    tree = RBTree.new({1 => 'x', 2 => 'x', 3 => 'y'})
+    inv = tree.invert
+    # 'x' appears twice — last one (key 2) overwrites first (key 1)
+    assert_equal 2, inv.size
+    assert_equal 2, inv['x']
+    assert_equal 3, inv['y']
+  end
+
+  def test_invert_returns_independent_tree
+    tree = RBTree.new({1 => 'a', 2 => 'b'})
+    inv = tree.invert
+    inv.delete('a')
+    assert_equal 2, tree.size
+  end
+
+  def test_invert_numeric_values
+    tree = RBTree.new({10 => 1, 20 => 2, 30 => 3})
+    inv = tree.invert
+    assert_equal [[1, 10], [2, 20], [3, 30]], inv.to_a
   end
 end
 
@@ -1601,5 +2060,434 @@ class TestMultiRBTree < Minitest::Test
 
   def test_merge_bang_returns_self
     assert_same @tree, @tree.merge!({})
+  end
+
+  # ============================================================
+  # dup
+  # ============================================================
+
+  def test_dup_basic
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    copy = @tree.dup
+    assert_instance_of MultiRBTree, copy
+    assert_equal @tree.to_a, copy.to_a
+    assert_equal 3, copy.size
+    assert copy.valid?
+  end
+
+  def test_dup_empty
+    copy = @tree.dup
+    assert copy.empty?
+    assert_equal 0, copy.size
+    assert copy.valid?
+  end
+
+  def test_dup_independence_delete_key_from_copy
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    copy = @tree.dup
+    copy.delete(1)
+    assert_equal 3, @tree.size
+    assert_equal 1, copy.size
+  end
+
+  def test_dup_independence_delete_value_from_copy
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    copy = @tree.dup
+    copy.delete_value(1)
+    assert_equal 2, @tree.size
+    assert_equal ['a', 'b'], @tree.values(1).to_a
+    assert_equal 1, copy.size
+    assert_equal ['b'], copy.values(1).to_a
+  end
+
+  def test_dup_independence_insert_into_copy
+    @tree.insert(1, 'a')
+    copy = @tree.dup
+    copy.insert(1, 'extra')
+    assert_equal 1, @tree.size
+    assert_equal 2, copy.size
+  end
+
+  def test_dup_preserves_value_order
+    @tree.insert(1, 'first')
+    @tree.insert(1, 'second')
+    @tree.insert(1, 'third')
+    copy = @tree.dup
+    assert_equal ['first', 'second', 'third'], copy.values(1).to_a
+  end
+
+  def test_dup_preserves_min_max
+    @tree.insert(3, 'c')
+    @tree.insert(1, 'a')
+    @tree.insert(5, 'e')
+    copy = @tree.dup
+    assert_equal [1, 'a'], copy.min
+    assert_equal [5, 'e'], copy.max
+  end
+
+  def test_dup_large_tree
+    100.times { |i| @tree.insert(i % 10, "v#{i}") }
+    copy = @tree.dup
+    assert_equal 100, copy.size
+    assert_equal @tree.to_a, copy.to_a
+    assert copy.valid?
+
+    copy.delete(0)
+    assert_equal 100, @tree.size
+  end
+
+  def test_dup_then_clear_original
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    copy = @tree.dup
+    @tree.clear
+    assert @tree.empty?
+    assert_equal 2, copy.size
+  end
+
+  def test_dup_can_be_dupped_again
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    copy1 = @tree.dup
+    copy2 = copy1.dup
+    copy1.delete(1)
+    assert_equal 2, copy2.size
+  end
+
+  # ============================================================
+  # select
+  # ============================================================
+
+  def test_select_by_key
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    result = @tree.select { |k, _| k == 1 }
+    assert_instance_of MultiRBTree, result
+    assert_equal [[1, 'a'], [1, 'b']], result.to_a
+    assert_equal 2, result.size
+  end
+
+  def test_select_by_value_among_duplicates
+    @tree.insert(1, 'keep')
+    @tree.insert(1, 'drop')
+    @tree.insert(1, 'keep')
+    result = @tree.select { |_, v| v == 'keep' }
+    assert_equal [[1, 'keep'], [1, 'keep']], result.to_a
+    assert_equal 2, result.size
+  end
+
+  def test_select_none_match
+    @tree.insert(1, 'a')
+    result = @tree.select { |_, _| false }
+    assert result.empty?
+  end
+
+  def test_select_all_match
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    result = @tree.select { |_, _| true }
+    assert_equal @tree.to_a, result.to_a
+  end
+
+  def test_select_empty_tree
+    result = @tree.select { |_, _| true }
+    assert result.empty?
+  end
+
+  def test_select_original_unchanged
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    @tree.select { |k, _| k == 1 }
+    assert_equal 3, @tree.size
+  end
+
+  def test_select_result_valid
+    30.times { |i| @tree.insert(i % 5, "v#{i}") }
+    result = @tree.select { |k, _| k.even? }
+    assert result.valid?
+  end
+
+  def test_select_enumerator
+    @tree.insert(1, 'a')
+    e = @tree.select
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # reject
+  # ============================================================
+
+  def test_reject_by_key
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    result = @tree.reject { |k, _| k == 1 }
+    assert_equal [[2, 'c']], result.to_a
+  end
+
+  def test_reject_by_value_among_duplicates
+    @tree.insert(1, 'keep')
+    @tree.insert(1, 'drop')
+    @tree.insert(1, 'keep')
+    result = @tree.reject { |_, v| v == 'drop' }
+    assert_equal [[1, 'keep'], [1, 'keep']], result.to_a
+  end
+
+  def test_reject_none_match
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    result = @tree.reject { |_, _| false }
+    assert_equal @tree.to_a, result.to_a
+  end
+
+  def test_reject_all_match
+    @tree.insert(1, 'a')
+    result = @tree.reject { |_, _| true }
+    assert result.empty?
+  end
+
+  def test_reject_empty_tree
+    result = @tree.reject { |_, _| false }
+    assert result.empty?
+  end
+
+  def test_reject_enumerator
+    e = @tree.reject
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # delete_if (individual value granularity)
+  # ============================================================
+
+  def test_delete_if_individual_values
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    @tree.delete_if { |k, v| k == 1 && v == 'a' }
+    assert_equal [[1, 'b'], [2, 'c']], @tree.to_a
+    assert_equal 2, @tree.size
+  end
+
+  def test_delete_if_removes_all_values_for_key
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    @tree.delete_if { |k, _| k == 1 }
+    assert_equal [[2, 'c']], @tree.to_a
+    assert_equal 1, @tree.size
+    refute @tree.has_key?(1)
+  end
+
+  def test_delete_if_none_match
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.delete_if { |_, _| false }
+    assert_equal 2, @tree.size
+  end
+
+  def test_delete_if_all_match
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    @tree.delete_if { |_, _| true }
+    assert @tree.empty?
+    assert @tree.valid?
+  end
+
+  def test_delete_if_empty_tree
+    result = @tree.delete_if { |_, _| true }
+    assert_same @tree, result
+  end
+
+  def test_delete_if_returns_self
+    @tree.insert(1, 'a')
+    result = @tree.delete_if { |_, _| false }
+    assert_same @tree, result
+  end
+
+  def test_delete_if_large_tree_validity
+    50.times { |i| @tree.insert(i % 5, "v#{i}") }
+    @tree.delete_if { |k, _| k.even? }
+    assert @tree.valid?
+    @tree.each { |k, _| assert k.odd? }
+  end
+
+  def test_delete_if_selective_among_many_duplicates
+    10.times { |i| @tree.insert(1, "v#{i}") }
+    # Delete even-indexed values
+    idx = -1
+    @tree.delete_if { |_, v| idx += 1; idx.even? }
+    assert_equal 5, @tree.size
+    assert_equal ['v1', 'v3', 'v5', 'v7', 'v9'], @tree.values(1).to_a
+  end
+
+  def test_delete_if_enumerator
+    e = @tree.delete_if
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # keep_if (individual value granularity)
+  # ============================================================
+
+  def test_keep_if_individual_values
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    @tree.keep_if { |_, v| v != 'a' }
+    assert_equal [[1, 'b'], [2, 'c']], @tree.to_a
+    assert_equal 2, @tree.size
+  end
+
+  def test_keep_if_keeps_all
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.keep_if { |_, _| true }
+    assert_equal 2, @tree.size
+  end
+
+  def test_keep_if_removes_all
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.keep_if { |_, _| false }
+    assert @tree.empty?
+    assert @tree.valid?
+  end
+
+  def test_keep_if_empty_tree
+    result = @tree.keep_if { |_, _| true }
+    assert_same @tree, result
+  end
+
+  def test_keep_if_returns_self
+    @tree.insert(1, 'a')
+    result = @tree.keep_if { |_, _| true }
+    assert_same @tree, result
+  end
+
+  def test_keep_if_large_tree_validity
+    50.times { |i| @tree.insert(i % 5, "v#{i}") }
+    @tree.keep_if { |k, _| k.odd? }
+    assert @tree.valid?
+    @tree.each { |k, _| assert k.odd? }
+  end
+
+  def test_keep_if_selective_among_many_duplicates
+    10.times { |i| @tree.insert(1, "v#{i}") }
+    @tree.keep_if { |_, v| v.end_with?('0', '5') }
+    assert_equal 2, @tree.size
+    assert_equal ['v0', 'v5'], @tree.values(1).to_a
+  end
+
+  def test_keep_if_enumerator
+    e = @tree.keep_if
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # reject!
+  # ============================================================
+
+  def test_reject_bang_returns_self_when_changed
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    result = @tree.reject! { |k, _| k == 1 }
+    assert_same @tree, result
+    assert_equal [[2, 'b']], @tree.to_a
+  end
+
+  def test_reject_bang_returns_nil_when_unchanged
+    @tree.insert(1, 'a')
+    result = @tree.reject! { |_, _| false }
+    assert_nil result
+  end
+
+  def test_reject_bang_empty_tree_returns_nil
+    result = @tree.reject! { |_, _| true }
+    assert_nil result
+  end
+
+  def test_reject_bang_individual_values
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    result = @tree.reject! { |_, v| v == 'a' }
+    assert_same @tree, result
+    assert_equal [[1, 'b']], @tree.to_a
+    assert_equal 1, @tree.size
+  end
+
+  def test_reject_bang_all_removed
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    result = @tree.reject! { |_, _| true }
+    assert_same @tree, result
+    assert @tree.empty?
+  end
+
+  def test_reject_bang_enumerator
+    e = @tree.reject!
+    assert_kind_of Enumerator, e
+  end
+
+  # ============================================================
+  # select and reject are complementary
+  # ============================================================
+
+  def test_select_reject_complementary
+    10.times { |i| @tree.insert(i % 3, "v#{i}") }
+    selected = @tree.select { |k, _| k == 0 }
+    rejected = @tree.reject { |k, _| k == 0 }
+    assert_equal @tree.size, selected.size + rejected.size
+  end
+
+  def test_delete_if_keep_if_complementary
+    10.times { |i| @tree.insert(i % 3, "v#{i}") }
+    tree1 = @tree.dup
+    tree2 = @tree.dup
+    tree1.delete_if { |k, _| k == 0 }
+    tree2.keep_if { |k, _| k == 0 }
+    assert_equal @tree.size, tree1.size + tree2.size
+  end
+
+  # --- invert ---
+
+  def test_invert_basic
+    @tree.insert(1, 'a')
+    @tree.insert(2, 'b')
+    inv = @tree.invert
+    assert_instance_of MultiRBTree, inv
+    assert_equal [['a', 1], ['b', 2]], inv.to_a
+  end
+
+  def test_invert_empty
+    inv = @tree.invert
+    assert_equal 0, inv.size
+  end
+
+  def test_invert_duplicate_values_preserved
+    @tree.insert(1, 'x')
+    @tree.insert(2, 'x')
+    @tree.insert(3, 'y')
+    inv = @tree.invert
+    # MultiRBTree preserves all pairs
+    assert_equal 3, inv.size
+    assert_equal [['x', 1], ['x', 2], ['y', 3]], inv.to_a
+  end
+
+  def test_invert_multi_values_per_key
+    @tree.insert(1, 'a')
+    @tree.insert(1, 'b')
+    @tree.insert(2, 'c')
+    inv = @tree.invert
+    assert_equal 3, inv.size
+    assert_equal [['a', 1], ['b', 1], ['c', 2]], inv.to_a
   end
 end

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-01-28
+
+### Added
+
+> **Note:** All methods added in this release are **convenience methods** composed from existing public API primitives (`each`, `insert`, `delete`, `dup`, `merge!`, `safe: true`). They provide no speed advantage over manual composition — their value is purely in readability and API completeness.
+
+- **`dup` (Deep Copy)**: `RBTree` and `MultiRBTree` now support `dup` and `clone` via `initialize_copy`. Creates an independent deep copy of the tree — modifications to the copy do not affect the original and vice versa.
+- **`select`**: Returns a new tree containing only key-value pairs for which the block returns true. Returns an `Enumerator` if no block is given.
+- **`reject`**: Returns a new tree excluding key-value pairs for which the block returns true. Returns an `Enumerator` if no block is given.
+- **`delete_if`**: Deletes key-value pairs in place for which the block returns true. Returns self. In `MultiRBTree`, operates at individual value granularity (can remove specific values without deleting the entire key).
+- **`reject!`**: Same as `delete_if`, but returns `nil` if no changes were made.
+- **`keep_if`**: Keeps only key-value pairs for which the block returns true, deleting the rest in place. Returns self. In `MultiRBTree`, operates at individual value granularity.
+- **`invert`**: Returns a new tree with keys and values swapped. For `RBTree`, duplicate values result in the last key winning (same as `Hash#invert`). For `MultiRBTree`, all pairs are preserved.
+- **`merge`** (non-destructive): Returns a new tree with merged contents. Supports block for duplicate key resolution: `tree.merge(other) { |key, v1, v2| v1 }`.
+- **`merge!` block support**: `merge!` now accepts a block for duplicate key resolution, matching `Hash#merge!` behavior.
+
+### Optimized
+- **`MultiRBTree#delete_if` / `#keep_if`**: Replaced clear-and-rebuild approach with in-place value array filtering via internal `filter_values!`. Avoids O(n log n) tree reconstruction; now runs in O(n) by directly mutating each node's value array and removing only emptied nodes.
+
+### Fixed
+- **`MultiRBTree#clear`**: Fixed `@value_count` not being reset when `clear` was called, which caused `size` to return incorrect values after clearing and re-inserting.
+
 ## [0.3.5] - 2026-01-26
 
 ### Optimized
@@ -230,6 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ASCII diagrams for tree rotation operations
 - MIT License (Copyright © 2026 Masahito Suzuki)
 
+[0.3.6]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.6
 [0.3.5]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.5
 [0.3.4]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.4
 [0.3.3]: https://github.com/firelzrd/rbtree-ruby/releases/tag/v0.3.3

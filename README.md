@@ -197,10 +197,58 @@ tree.to_a  # => [[1, "one"], [2, "two"]]
 # Convert to Hash
 tree.to_h  # => {1 => "one", 2 => "two"}
 
-# Merge another tree, hash, or enumerable
+# Merge (destructive)
 other = {3 => 'three'}
 tree.merge!(other)
 tree.size  # => 3
+
+# Merge (non-destructive) — returns a new tree
+merged = tree.merge({4 => 'four'})
+
+# Merge with block for duplicate key resolution
+merged = tree.merge({1 => 'ONE'}) { |key, old_val, new_val| old_val }
+
+# Invert keys and values
+tree = RBTree.new({1 => 'a', 2 => 'b', 3 => 'c'})
+tree.invert.to_a  # => [["a", 1], ["b", 2], ["c", 3]]
+```
+
+### Filtering and Copying
+
+> **Note:** `dup`, `select`, `reject`, `delete_if`, `reject!`, `keep_if`, `invert`, and `merge` are convenience methods composed from existing primitives. They provide no speed advantage over manual composition — their value is in readability and API completeness.
+
+Create copies or filter trees using familiar Ruby idioms:
+
+```ruby
+tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
+
+# Deep copy — independent of original
+copy = tree.dup
+copy.delete(1)
+tree.size  # => 4 (unchanged)
+
+# select / reject — return a new tree
+evens = tree.select { |k, _| k.even? }   # => {2=>"two", 4=>"four"}
+odds  = tree.reject { |k, _| k.even? }   # => {1=>"one", 3=>"three"}
+
+# delete_if / keep_if — modify in place
+tree.delete_if { |k, _| k > 2 }
+tree.to_a  # => [[1, "one"], [2, "two"]]
+
+# reject! — like delete_if, but returns nil if nothing changed
+tree.reject! { |_, _| false }  # => nil
+```
+
+For `MultiRBTree`, `delete_if` and `keep_if` operate at individual value granularity:
+
+```ruby
+tree = MultiRBTree.new
+tree.insert(1, 'a')
+tree.insert(1, 'b')
+tree.insert(2, 'c')
+
+tree.delete_if { |k, v| k == 1 && v == 'a' }
+tree.to_a  # => [[1, "b"], [2, "c"]]  — only 'a' was removed
 ```
 
 ### MultiRBTree Value Array Access

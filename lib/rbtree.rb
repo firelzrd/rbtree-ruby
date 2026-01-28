@@ -111,6 +111,16 @@ class RBTree
     end
   end
 
+  # Creates a deep copy of the tree.
+  # Called automatically by `dup` and `clone`.
+  #
+  # @param orig [RBTree] the original tree to copy
+  # @return [void]
+  def initialize_copy(orig)
+    initialize(overwrite: orig.instance_variable_get(:@overwrite))
+    orig.each { |k, v| insert(k, v) }
+  end
+
   # Returns a Hash containing all key-value pairs from the tree.
   #
   # @return [Hash] a new Hash with the tree's contents
@@ -369,16 +379,43 @@ class RBTree
   end
   alias :[]= :insert
   
-  # Merges the contents of another tree, hash, or enumerable into this tree.
+  # Returns a new tree containing the merged contents of self and other.
+  #
+  # When a block is given, it is called with (key, old_value, new_value) for
+  # duplicate keys, and the block's return value is used.
   #
   # @param other [RBTree, Hash, Enumerable] the source to merge from
-  # @param overwrite [Boolean] whether to overwrite existing keys (default: true)
+  # @yield [key, old_value, new_value] called for duplicate keys when block given
+  # @return [RBTree] a new tree with merged contents
+  def merge(other, &block)
+    dup.merge!(other, &block)
+  end
+
+  # Merges the contents of another tree, hash, or enumerable into this tree.
+  #
+  # When a block is given, it is called with (key, old_value, new_value) for
+  # duplicate keys, and the block's return value is used.
+  #
+  # @param other [RBTree, Hash, Enumerable] the source to merge from
+  # @param overwrite [Boolean] whether to overwrite existing keys (default: true). Ignored if block given.
+  # @yield [key, old_value, new_value] called for duplicate keys when block given
   # @return [RBTree] self
-  def merge!(other, overwrite: true)
+  def merge!(other, overwrite: true, &block)
     if defined?(MultiRBTree) && other.is_a?(MultiRBTree)
       raise ArgumentError, "Cannot merge MultiRBTree into RBTree"
     end
-    insert(other, overwrite: overwrite)
+    if block
+      other_enum = other.is_a?(Hash) || other.is_a?(RBTree) ? other : other.each
+      other_enum.each do |k, v|
+        if has_key?(k)
+          insert_entry(k, block.call(k, value(k), v), overwrite: true)
+        else
+          insert_entry(k, v)
+        end
+      end
+    else
+      insert(other, overwrite: overwrite)
+    end
     self
   end
 
@@ -600,6 +637,72 @@ class RBTree
     return enum_for(__method__, min, max, include_min: include_min, include_max: include_max, reverse: reverse, safe: safe) unless block_given?
     traverse_range(reverse, min, max, include_min, include_max, safe: safe, &block)
     self
+  end
+
+  # Returns a new tree containing key-value pairs for which the block returns true.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [RBTree, Enumerator] a new tree with selected pairs, or Enumerator if no block
+  def select(&block)
+    return enum_for(__method__) { size } unless block_given?
+    result = self.class.new
+    each { |k, v| result.insert(k, v) if block.call(k, v) }
+    result
+  end
+
+  # Returns a new tree containing key-value pairs for which the block returns false.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [RBTree, Enumerator] a new tree with non-rejected pairs, or Enumerator if no block
+  def reject(&block)
+    return enum_for(__method__) { size } unless block_given?
+    result = self.class.new
+    each { |k, v| result.insert(k, v) unless block.call(k, v) }
+    result
+  end
+
+  # Deletes key-value pairs for which the block returns true. Returns nil if no changes were made.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [RBTree, nil, Enumerator] self if changed, nil if unchanged, or Enumerator if no block
+  def reject!(&block)
+    return enum_for(__method__) { size } unless block_given?
+    size_before = size
+    delete_if(&block)
+    size == size_before ? nil : self
+  end
+
+  # Keeps key-value pairs for which the block returns true, deleting the rest. Modifies the tree in place.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [RBTree, Enumerator] self, or Enumerator if no block
+  def keep_if(&block)
+    return enum_for(__method__) { size } unless block_given?
+    each(safe: true) { |k, v| delete(k) unless block.call(k, v) }
+    self
+  end
+
+  # Deletes key-value pairs for which the block returns true. Modifies the tree in place.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [RBTree, Enumerator] self, or Enumerator if no block
+  def delete_if(&block)
+    return enum_for(__method__) { size } unless block_given?
+    each(safe: true) { |k, v| delete(k) if block.call(k, v) }
+    self
+  end
+
+  # Returns a new tree with keys and values swapped.
+  #
+  # For RBTree, duplicate values result in later keys overwriting earlier ones.
+  # For MultiRBTree, all key-value pairs are preserved.
+  # Values must implement <=> to serve as keys in the new tree.
+  #
+  # @return [RBTree, MultiRBTree] a new tree with keys and values inverted
+  def invert
+    result = self.class.new
+    each { |k, v| result.insert(v, k) }
+    result
   end
 
   # Returns a string representation of the tree.
@@ -1516,6 +1619,13 @@ class MultiRBTree < RBTree
   # Returns the number of values stored in the tree.
   # @return [Integer] the number of values in the tree
   def size = @value_count
+
+  # Removes all elements from the tree.
+  # @return [MultiRBTree] self
+  def clear
+    @value_count = 0
+    super
+  end
   
   # Returns the minimum key-value pair without removing it.
   #
@@ -1718,8 +1828,45 @@ class MultiRBTree < RBTree
     [key, val]
   end
 
+  # Keeps key-value pairs for which the block returns true, deleting the rest.
+  # Unlike RBTree, this removes individual values rather than entire keys.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [MultiRBTree, Enumerator] self, or Enumerator if no block
+  def keep_if(&block)
+    return enum_for(__method__) { size } unless block_given?
+    filter_values! { |k, v| block.call(k, v) }
+    self
+  end
+
+  # Deletes key-value pairs for which the block returns true.
+  # Unlike RBTree, this removes individual values rather than entire keys.
+  #
+  # @yield [key, value] each key-value pair
+  # @return [MultiRBTree, Enumerator] self, or Enumerator if no block
+  def delete_if(&block)
+    return enum_for(__method__) { size } unless block_given?
+    filter_values! { |k, v| !block.call(k, v) }
+    self
+  end
+
   # @!visibility private
   private
+
+  # Filters values in-place across all nodes.
+  # Keeps only values for which the block returns true.
+  # Removes nodes whose value arrays become empty.
+  # Updates @value_count accordingly.
+  def filter_values!
+    keys_to_delete = []
+    @hash_index.each do |key, node|
+      before = node.value.size
+      node.value.select! { |v| yield key, v }
+      @value_count -= before - node.value.size
+      keys_to_delete << key if node.value.empty?
+    end
+    keys_to_delete.each { |k| delete_indexed_node(k) }
+  end
 
   # Inserts a value for the given key.
   #

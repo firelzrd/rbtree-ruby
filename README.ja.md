@@ -197,10 +197,58 @@ tree.to_a  # => [[1, "one"], [2, "two"]]
 # ハッシュへの変換
 tree.to_h  # => {1 => "one", 2 => "two"}
 
-# 他のツリー、ハッシュ、またはEnumerableの結合
+# 結合（破壊的）
 other = {3 => 'three'}
 tree.merge!(other)
 tree.size  # => 3
+
+# 結合（非破壊） — 新しいツリーを返す
+merged = tree.merge({4 => 'four'})
+
+# ブロックで重複キーの解決
+merged = tree.merge({1 => 'ONE'}) { |key, old_val, new_val| old_val }
+
+# キーと値を入れ替え
+tree = RBTree.new({1 => 'a', 2 => 'b', 3 => 'c'})
+tree.invert.to_a  # => [["a", 1], ["b", 2], ["c", 3]]
+```
+
+### フィルタリングとコピー
+
+> **注記:** `dup`、`select`、`reject`、`delete_if`、`reject!`、`keep_if`、`invert`、`merge` は既存のプリミティブを組み合わせた利便性メソッドです。手動で同等の処理を書いた場合と比べて速度上の利点はありません。可読性とAPI互換性のために提供されています。
+
+Rubyの慣習的なメソッドでツリーのコピーやフィルタリングが可能です:
+
+```ruby
+tree = RBTree.new({1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four'})
+
+# ディープコピー — 元のツリーと独立
+copy = tree.dup
+copy.delete(1)
+tree.size  # => 4 (変更なし)
+
+# select / reject — 新しいツリーを返す
+evens = tree.select { |k, _| k.even? }   # => {2=>"two", 4=>"four"}
+odds  = tree.reject { |k, _| k.even? }   # => {1=>"one", 3=>"three"}
+
+# delete_if / keep_if — 破壊的に変更
+tree.delete_if { |k, _| k > 2 }
+tree.to_a  # => [[1, "one"], [2, "two"]]
+
+# reject! — delete_ifと同様だが、変更がなければnilを返す
+tree.reject! { |_, _| false }  # => nil
+```
+
+`MultiRBTree`では、`delete_if`と`keep_if`は個々の値単位で操作します:
+
+```ruby
+tree = MultiRBTree.new
+tree.insert(1, 'a')
+tree.insert(1, 'b')
+tree.insert(2, 'c')
+
+tree.delete_if { |k, v| k == 1 && v == 'a' }
+tree.to_a  # => [[1, "b"], [2, "c"]]  — 'a'のみ削除された
 ```
 
 ### MultiRBTree 値配列アクセス
